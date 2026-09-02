@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网络攻防与信息安全 · 实验室招新</title>
+  <meta name="description" content="网络攻防与信息安全实验室招新 —— 软件 / 硬件 / 算法 / 人工智能">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='black'/%3E%3Ctext x='16' y='23' font-size='18' fill='white' text-anchor='middle' font-family='monospace'%3E%26%2350957;%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="bg" aria-hidden="true"></canvas>
+
+  <!-- 顶部导航 -->
+  <nav class="nav">
+    <a class="nav-brand" href="#hero">网络攻防<span class="brand-dot">.</span></a>
+    <div class="nav-links">
+      <a href="#directions">方向</a>
+      <a href="#apply">报名</a>
+      <a href="#links">友链</a>
+    </div>
+  </nav>
+
+  <main class="snap">
+
+    <!-- ============ HERO ============ -->
+    <section class="screen hero" id="hero">
+      <div class="hero-inner">
+        <p class="kicker">NETWORK SECURITY &amp; INFORMATION SECURITY LAB</p>
+        <h1 class="display">网络攻防<br><span class="display-2">与信息安全</span></h1>
+        <p class="tagline">攻击与防御，是同一门手艺 —— 欢迎来实验室一起折腾</p>
+        <p class="faculty">指导老师 — 李世明 · 倪蕴涛（物联系主任）</p>
+        <a class="cta" href="#directions">开始报名 →</a>
+      </div>
+    </section>
+
+    <!-- ============ 研究方向 ============ -->
+    <section class="screen directions" id="directions">
+      <div class="shell">
+        <header class="sec-head">
+          <span class="sec-label">DIRECTIONS / 研究方向</span>
+          <h2 class="sec-title">你想做什么？</h2>
+        </header>
+        <div class="dir-list">
+          <button class="dir-row reveal" data-direction="软件">
+            <span class="cn">软件</span>
+            <span class="en">SOFTWARE</span>
+            <span class="desc">写代码 · 修漏洞 · 逆向分析</span>
+          </button>
+          <button class="dir-row reveal" data-direction="硬件">
+            <span class="cn">硬件</span>
+            <span class="en">HARDWARE</span>
+            <span class="desc">拆设备 · 焊板子 · 跑固件</span>
+          </button>
+          <button class="dir-row reveal" data-direction="算法">
+            <span class="cn">算法</span>
+            <span class="en">ALGORITHM</span>
+            <span class="desc">数学是武器，也是防线</span>
+          </button>
+          <button class="dir-row reveal" data-direction="人工智能">
+            <span class="cn">人工智能</span>
+            <span class="en">AI</span>
+            <span class="desc">用 AI 攻，也用 AI 守</span>
+          </button>
+        </div>
+        <p class="hint reveal">选择方向 → 自动带入报名表</p>
+      </div>
+    </section>
+
+    <!-- ============ 报名表 ============ -->
+    <section class="screen apply" id="apply">
+      <div class="shell">
+        <header class="sec-head reveal">
+          <span class="sec-label">APPLICATION / 报名</span>
+          <h2 class="sec-title">加入我们</h2>
+        </header>
+
+        <form id="app-form" class="reveal" novalidate>
+          <div class="field">
+            <label for="name">姓名 <span class="req">*</span></label>
+            <input type="text" id="name" name="name" required autocomplete="name" placeholder="你的名字">
+          </div>
+
+          <div class="field">
+            <label for="major">专业 <span class="req">*</span></label>
+            <input type="text" id="major" name="major" required placeholder="如：网络工程 / 计算机科学与技术">
+          </div>
+
+          <div class="field">
+            <label for="direction">方向 <span class="req">*</span></label>
+            <select id="direction" name="direction" required>
+              <option value="" disabled selected>选择方向</option>
+              <option value="软件">软件</option>
+              <option value="硬件">硬件</option>
+              <option value="算法">算法</option>
+              <option value="人工智能">人工智能</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="photo">照片 <span class="req">*</span> <span class="opt">必填，支持点击或拖入</span></label>
+            <label class="photo-drop" id="photo-drop">
+              <input type="file" id="photo" name="photo" accept="image/*">
+              <span id="photo-drop-hint">⊞ 点击选择照片</span>
+            </label>
+            <div class="photo-preview" id="photo-preview" hidden></div>
+          </div>
+
+          <div class="field full">
+            <label for="intro">个人简介 <span class="req">*</span></label>
+            <textarea id="intro" name="intro" rows="4" required placeholder="简单介绍下自己，为什么想加入"></textarea>
+          </div>
+
+          <div class="field full">
+            <label for="learned">已学内容 <span class="opt">选填</span></label>
+            <textarea id="learned" name="learned" rows="3" placeholder="学过的语言 / 框架 / 做过的东西"></textarea>
+          </div>
+
+          <div class="field full">
+            <label for="ai_views">对 AI 发展的看法 <span class="opt">可选</span></label>
+            <textarea id="ai_views" name="ai_views" rows="3" placeholder="随意聊聊，一两句也行"></textarea>
+          </div>
+
+          <div class="field full form-actions">
+            <button type="submit" class="submit">提交报名 →</button>
+            <p id="form-status" class="form-status" role="status"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ============ 友情链接 ============ -->
+    <section class="screen links" id="links">
+      <div class="shell">
+        <header class="sec-head">
+          <span class="sec-label">LINKS / 友情链接</span>
+          <h2 class="sec-title">更多内容</h2>
+        </header>
+        <div id="link-list" class="link-list reveal"></div>
+        <footer class="foot">© 2026 网络攻防与信息安全实验室</footer>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
