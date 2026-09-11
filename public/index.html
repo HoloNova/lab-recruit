@@ -19,8 +19,9 @@
     <a class="nav-brand" href="#hero">网络攻防<span class="brand-dot">.</span></a>
     <div class="nav-links">
       <a href="#directions">方向</a>
+      <a href="#timeline">时间线</a>
       <a href="#apply">报名</a>
-      <a href="#links">友链</a>
+      <a href="#join">加群</a>
     </div>
   </nav>
 
@@ -33,7 +34,7 @@
         <h1 class="display">网络攻防<br><span class="display-2">与信息安全</span></h1>
         <p class="tagline">攻击与防御，是同一门手艺 —— 欢迎来实验室一起折腾</p>
         <p class="faculty">指导老师 — 李世明 · 倪蕴涛（物联系主任）</p>
-        <a class="cta" href="#directions">开始报名 →</a>
+        <a class="cta" href="#directions">了解方向 →</a>
       </div>
     </section>
 
@@ -70,6 +71,63 @@
       </div>
     </section>
 
+    <!-- ============ 招新时间线 ============ -->
+    <section class="screen timeline" id="timeline">
+      <div class="shell">
+        <header class="sec-head">
+          <span class="sec-label">TIMELINE / 招新流程</span>
+          <h2 class="sec-title">接下来会发生什么</h2>
+        </header>
+        <ol class="tl-list" id="tl-list">
+          <li class="tl-item reveal" data-phase="warmup">
+            <span class="tl-dot" aria-hidden="true"></span>
+            <div class="tl-body">
+              <span class="tl-when">现在</span>
+              <h3 class="tl-title">预热了解</h3>
+              <p class="tl-desc">加入招新群，了解实验室日常与研究方向。群里只做通知，不作为报名依据。</p>
+            </div>
+          </li>
+          <li class="tl-item reveal" data-phase="signup">
+            <span class="tl-dot" aria-hidden="true"></span>
+            <div class="tl-body">
+              <span class="tl-when">国庆假期后</span>
+              <h3 class="tl-title">正式报名</h3>
+              <p class="tl-desc">网站开放完整报名表，群内同步发布链接与截止时间。<strong>所有人必须通过本页面提交</strong>，群接龙、私聊都不算报名。</p>
+            </div>
+          </li>
+          <li class="tl-item reveal" data-phase="review">
+            <span class="tl-dot" aria-hidden="true"></span>
+            <div class="tl-body">
+              <span class="tl-when">报名截止后</span>
+              <h3 class="tl-title">初筛与面试</h3>
+              <p class="tl-desc">我们审阅报名表并筛出面试名单。面试安排将在招新群内公布。</p>
+            </div>
+          </li>
+          <li class="tl-item reveal" data-phase="result">
+            <span class="tl-dot" aria-hidden="true"></span>
+            <div class="tl-body">
+              <span class="tl-when">面试结束后</span>
+              <h3 class="tl-title">结果公布</h3>
+              <p class="tl-desc">录取名单在招新群内公布。</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ 公告 ============ -->
+    <section class="screen notices" id="notices">
+      <div class="shell">
+        <header class="sec-head">
+          <span class="sec-label">NOTICE / 招新公告</span>
+          <h2 class="sec-title">最新通知</h2>
+        </header>
+        <div id="notice-list" class="notice-list reveal">
+          <p class="hint">公告加载中…</p>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ 报名表 ============ -->
     <section class="screen apply" id="apply">
       <div class="shell">
@@ -78,15 +136,52 @@
           <h2 class="sec-title">加入我们</h2>
         </header>
 
+        <!-- 报名未开放时的提示条 -->
+        <div id="phase-banner" class="phase-banner reveal" hidden></div>
+
+        <!-- 本设备已提交过的记录 -->
+        <div id="device-card" class="device-card reveal" hidden></div>
+
+        <!-- 编辑模式提示条 -->
+        <div id="edit-banner" class="edit-banner" hidden>
+          <span id="edit-banner-text"></span>
+          <button type="button" id="edit-cancel" class="link-btn">退出修改</button>
+        </div>
+
         <form id="app-form" class="reveal" novalidate>
           <div class="field">
+            <label for="student_id">学号 <span class="req">*</span></label>
+            <input type="text" id="student_id" name="student_id" required inputmode="numeric"
+                   autocomplete="off" maxlength="20" placeholder="2026xxxxxx">
+          </div>
+
+          <div class="field">
             <label for="name">姓名 <span class="req">*</span></label>
-            <input type="text" id="name" name="name" required autocomplete="name" placeholder="你的名字">
+            <input type="text" id="name" name="name" required autocomplete="name" maxlength="20" placeholder="你的名字">
+          </div>
+
+          <div class="field">
+            <label for="class_name">班级 <span class="req">*</span></label>
+            <input type="text" id="class_name" name="class_name" required maxlength="30" placeholder="如：网络工程 2 班">
           </div>
 
           <div class="field">
             <label for="major">专业 <span class="req">*</span></label>
-            <input type="text" id="major" name="major" required placeholder="如：网络工程 / 计算机科学与技术">
+            <input type="text" id="major" name="major" required maxlength="30" placeholder="如：网络工程 / 计算机科学与技术">
+          </div>
+
+          <div class="field">
+            <label for="contact_type">联系方式类型 <span class="req">*</span></label>
+            <select id="contact_type" name="contact_type" required>
+              <option value="" disabled selected>选择类型</option>
+              <option value="wechat">微信号</option>
+              <option value="phone">手机号</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="contact">联系方式 <span class="req">*</span></label>
+            <input type="text" id="contact" name="contact" required maxlength="50" autocomplete="off" placeholder="微信号或手机号">
           </div>
 
           <div class="field">
@@ -101,34 +196,78 @@
           </div>
 
           <div class="field full">
-            <label for="photo">照片 <span class="req">*</span> <span class="opt">必填，支持点击或拖入</span></label>
-            <label class="photo-drop" id="photo-drop">
-              <input type="file" id="photo" name="photo" accept="image/*">
-              <span id="photo-drop-hint">⊞ 点击选择照片</span>
-            </label>
-            <div class="photo-preview" id="photo-preview" hidden></div>
-          </div>
-
-          <div class="field full">
             <label for="intro">个人简介 <span class="req">*</span></label>
-            <textarea id="intro" name="intro" rows="4" required placeholder="简单介绍下自己，为什么想加入"></textarea>
+            <textarea id="intro" name="intro" rows="4" required maxlength="200" placeholder="简单介绍下自己，为什么想加入（不超过 200 字）"></textarea>
           </div>
 
           <div class="field full">
             <label for="learned">已学内容 <span class="opt">选填</span></label>
-            <textarea id="learned" name="learned" rows="3" placeholder="学过的语言 / 框架 / 做过的东西"></textarea>
+            <textarea id="learned" name="learned" rows="3" maxlength="200" placeholder="学过的语言 / 框架 / 做过的东西（不超过 200 字）"></textarea>
           </div>
 
           <div class="field full">
-            <label for="ai_views">对 AI 发展的看法 <span class="opt">可选</span></label>
-            <textarea id="ai_views" name="ai_views" rows="3" placeholder="随意聊聊，一两句也行"></textarea>
+            <label for="ai_views">对 AI 发展的看法 <span class="opt">选填</span></label>
+            <textarea id="ai_views" name="ai_views" rows="3" maxlength="200" placeholder="随意聊聊，一两句也行（不超过 200 字）"></textarea>
+          </div>
+
+          <div class="field full captcha-field">
+            <label for="captcha_answer">人机验证 <span class="req">*</span></label>
+            <div class="captcha-row">
+              <img id="captcha-img" class="captcha-img" alt="验证码（点击可更换）" width="150" height="50">
+              <input type="text" id="captcha_answer" name="captcha_answer" required maxlength="8"
+                     autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入图中字符">
+              <button type="button" id="captcha-refresh" class="link-btn">换一张</button>
+            </div>
           </div>
 
           <div class="field full form-actions">
-            <button type="submit" class="submit">提交报名 →</button>
-            <p id="form-status" class="form-status" role="status"></p>
+            <button type="submit" class="submit" id="submit-btn">提交报名 →</button>
+            <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
           </div>
+
+          <!-- 编辑码掉落后的人工兜底入口 -->
+          <div class="field full" id="have-token-wrap" hidden>
+            <label for="edit_token_input">已有编辑码？</label>
+            <div class="captcha-row">
+              <input type="text" id="edit_token_input" maxlength="64" autocomplete="off" placeholder="粘贴首次提交时保存的编辑码">
+              <button type="button" id="edit-start" class="link-btn">修改我的报名</button>
+            </div>
+          </div>
+
+          <p class="form-foot" id="form-foot"></p>
         </form>
+
+        <!-- 提交成功后一次性展示编辑码 -->
+        <div id="token-panel" class="token-panel" hidden>
+          <h3>请立即保存你的编辑码</h3>
+          <p class="token-note">这是你之后修改报名信息的唯一凭证，<strong>我们不会再显示它</strong>。建议截图或复制到备忘录。</p>
+          <div class="token-box">
+            <code id="token-value"></code>
+            <button type="button" id="token-copy" class="link-btn">复制</button>
+          </div>
+          <p class="token-warn">请勿把编辑码发给他人。丢失编辑码需联系管理员人工核验身份。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 加群 ============ -->
+    <section class="screen join" id="join">
+      <div class="shell">
+        <header class="sec-head">
+          <span class="sec-label">GROUP / 招新群</span>
+          <h2 class="sec-title">先加群，别错过通知</h2>
+        </header>
+        <div class="join-grid reveal">
+          <div class="join-qr">
+            <img id="qr-img" alt="招新群二维码" hidden>
+            <p id="qr-fallback" class="hint"></p>
+          </div>
+          <div class="join-info">
+            <p>群里只做通知：报名开放、面试安排、结果公布都会在这里同步。</p>
+            <p class="warn">二维码 7 天后会失效。<strong>建议转发本页链接，不要转发二维码截图</strong>——截图过期后同学就扫不进来了。</p>
+            <p id="join-contact" class="hint"></p>
+          </div>
+        </div>
       </div>
     </section>
 

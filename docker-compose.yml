@@ -1,0 +1,32 @@
+# 招新站 —— 只跑应用容器，前置 nginx 已在服务器上（同为 Docker）
+#
+# 关键：本服务不发布任何宿主机端口（没有 ports:），只加入 nginx 所在的
+# 外部网络，由 nginx 按容器名 recruit-app 反向代理。
+# 这样公网唯一的入口就是 nginx 的 80/443。
+
+services:
+  app:
+    build: .
+    image: recruit-app:latest
+    container_name: recruit-app
+    restart: unless-stopped
+    env_file: .env
+    # 与宿主机数据目录属主对齐，否则 SQLite 写入会失败（见 README 部署说明）
+    user: "${PUID:-1000}:${PGID:-1000}"
+    volumes:
+      - ./public:/app/public:ro      # 前端静态资源：改完即生效，无需重启
+      - ./data:/app/data             # SQLite / 群二维码 / 备份（持久化）
+    expose:
+      - "3001"                       # 仅容器网络内可见
+    networks:
+      - web
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  web:
+    external: true
+    name: ${NGINX_NETWORK}

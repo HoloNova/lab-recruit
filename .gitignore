@@ -1,7 +1,12 @@
 # 依赖
 node_modules/
 
-# 运行时数据（数据库、上传的照片、日志）
+# 环境变量（含 pepper 密钥，绝不入库）
+.env
+
+# 运行时数据（数据库、二维码、备份）
+data/
+# 兼容旧版本的运行时文件
 data.db
 data.db-shm
 data.db-wal
@@ -11,5 +16,9 @@ server.log
 # 系统文件
 .DS_Store
 
-# 临时/探索脚本
+# 临时/探索脚本（activetheory 站点侦察，与本项目无关）
 scout/
+
+# 测试与临时输出
+coverage/
+*.log
