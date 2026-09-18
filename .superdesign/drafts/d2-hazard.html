@@ -1,0 +1,2526 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="editor-dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>网络攻防与信息安全 · 实验室招新</title>
+<meta name="description" content="网络攻防与信息安全实验室招新 —— 软件 / 硬件 / 算法 / 人工智能">
+<meta name="theme-color" content="#0b0b0d">
+<style data-source="themes/02-editor-dark.css">
+/* ============================================================
+   主题 02 · 编辑器（深色）
+   取自 VSCode 默认深色主题（extensions/theme-defaults）。
+
+   ⚠ 这里有两处刻意偏离 VSCode 原生值，因为原生值不达 WCAG：
+     editorLineNumber.foreground #6E7681 → 3.59:1  ✗  改用 #8a9199 = 5.17:1
+     focusBorder               #0078D4 → 3.64:1  ✗  改用 #4da3e8 = 6.06:1
+   浅色主题下这两个原生值是 4.59:1 / 6.31:1，达标，所以照用。
+
+   对比度（对 --ed-bg 实算）：
+     --ed-fg      #cccccc  10.26:1  AAA
+     --ed-fg-2    #8a9199   5.17:1  AA
+     --ed-gutter  #8a9199   5.17:1  AA
+     --ed-accent  #4da3e8   6.06:1  AA
+     --ed-add     #4ec9b0   8.09:1  AAA
+     --ed-del     #f48771   6.71:1  AA
+   ============================================================ */
+
+[data-theme="editor-dark"] {
+  /* 表面 */
+  --ed-bg: #1f1f1f;
+  --ed-bg-2: #262626;
+  --ed-guide: #3a3a3a;
+
+  /* 文字 */
+  --ed-fg: #cccccc;
+  --ed-fg-2: #8a9199;
+  --ed-gutter: #8a9199;
+
+  /* 语义 */
+  --ed-accent: #4da3e8;
+  --ed-add: #4ec9b0;
+  --ed-del: #f48771;
+
+  /* 四个方向 —— 深底上整体提亮，保持与浅色主题相同的语义色相 */
+  --dir-sw: #4da3e8;
+  --dir-hw: #e0a458;
+  --dir-al: #c586e0;
+  --dir-ai: #4ec9b0;
+
+  /* ---------- 语法色：直接取 VSCode Dark+ 原生值 ----------
+     这 11 个色压在 --ed-bg #1f1f1f 上全部 ≥4.5:1（实算见计划 §4.1），
+     所以不需要为了对比度调色。这是「原生 VSCode」能成立的前提。 */
+  --syn-kw:    #569cd6;   /* 声明关键字  5.59:1 */
+  --syn-ct:    #c586c0;   /* 控制流      5.92:1 */
+  --syn-ty:    #4ec9b0;   /* 类型        8.09:1 */
+  --syn-fn:    #dcdcaa;   /* 函数/注解  11.66:1 */
+  --syn-va:    #9cdcfe;   /* 变量       11.05:1 */
+  --syn-st:    #ce9178;   /* 字符串      6.24:1 */
+  --syn-nu:    #b5cea8;   /* 数字        9.70:1 */
+  --syn-cm:    #6a9955;   /* 注释        4.95:1 */
+  --syn-an:    #dcdcaa;
+  --syn-pp:    #569cd6;   /* 预处理 */
+  --syn-op:    #d4d4d4;
+
+  /* 编辑器界面色 */
+  --syn-ln:    #8a9199;   /* 行号    5.17:1（原生 #6e7681 只有 3.59，已修正） */
+  --syn-caret: #aeafad;
+  --syn-sel:   #264f78;   /* 选区蓝 */
+}
+
+</style>
+<style data-source="public/codefield.css">
+/* ============================================================
+   代码场域 —— 页面上侧的一条代码带
+   z-index 0，内容面板盖在它下缘的渐隐区上。代码带保持 alpha 1.0 全饱和：
+   压暗会让语法颜色消失，代码就退化成灰噪声（见计划 §1 的 alpha 实测）。
+
+   语法色取自 VSCode Dark+ 原生值，压在 #1f1f1f 上全部 ≥4.5:1，
+   所以不需要为了对比度调色 —— 这是「原生 VSCode」能成立的前提。
+   ============================================================ */
+
+/* ⚠ 高度必须定义在 :root 上，不能只写在 .cf 里。
+   .cf 和页面内容是**兄弟**关系，自定义属性不跨兄弟继承 ——
+   写在 .cf 上时，.hero 里的 var(--cf-h, 340px) 会一直取那个兜底值 340px，
+   于是面板位置在窄屏上悄悄错了（实测 320px 下偏了 44px）。
+   :root 上定义一次，两边都读得到。 */
+:root {
+  /* 代码带高度：页面上侧的一小部分，剩下的页面是纯黑。
+     46vh 是有意的：玻璃卡片压在上面时，卡片下方还能露出一段没被遮的原始代码。 */
+  --cf-h: clamp(300px, 46vh, 460px);
+  /* 渐隐起点：从这个高度开始，代码和底一起淡向透明（＝露出下面的纯黑） */
+  --cf-fade: 46%;
+}
+/* 矮屏（横屏手机）：带子再压一点，别把内容都挤下去 */
+@media (max-height: 560px) {
+  :root { --cf-h: clamp(220px, 54vh, 320px); --cf-fade: 48%; }
+}
+
+.cf {
+  /* 字体：全部系统字体，零下载。等宽字是代码辨识度的必要条件，
+     语法颜色才是充分条件。 */
+  --cf-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+             "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --cf-fs: clamp(11px, 3.05vw, 12.5px);
+  --cf-lh: 1.62;
+  --cf-gut: 46px;            /* 行号栏宽度 */
+  --cf-top: 30px;            /* 顶部面包屑留白 */
+
+  /* fixed：内容从页面顶部开始、在带子上方滑过去。
+     这样每一张玻璃卡片往下滚的时候背后都有活的代码，
+     而不是只有第一屏能看到。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--cf-h);
+  z-index: 1;
+  overflow: hidden;
+  /* 底色透明，让下面的氛围层透上来 ——
+     这样整条带子都有色调起伏，玻璃卡片到处都有东西可透，
+     而不是只有代码那 360px 宽的范围里有。
+     顺带：代码的对比度按纯黑算反而更高（原来按 #1f1f1f 算的）。 */
+  background: transparent;
+  color: var(--ed-fg, #cccccc);
+  font-family: var(--cf-font);
+  font-size: var(--cf-fs);
+  line-height: var(--cf-lh);
+  font-variant-ligatures: none;       /* 连字会让逐字宽度不可预测，也会把 -> 变成箭头 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 底部渐隐到纯黑。
+     遮罩盖的是整个代码带（连底色一起），所以下面不是「被切一刀」，
+     而是代码和背景一起溶进页面的纯黑里。 */
+  -webkit-mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+  mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+
+  /* 提升为独立合成层：代码带每 tick 只重绘自己，不牵动整页 */
+  transform: translateZ(0);
+  contain: layout paint style;
+  user-select: none;
+  pointer-events: none;               /* 装饰层，绝不抢点击 */
+}
+
+@media (min-width: 900px) { .cf { --cf-fs: 13.5px; --cf-gut: 54px; } }
+/* 手机上把行号栏收窄，多出约 16px 给代码 */
+@media (max-width: 899px) { .cf { --cf-gut: 30px; } }
+
+/* ---------- 顶部面包屑：告诉你现在看的是哪个文件 ---------- */
+.cf-meta {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: var(--cf-top);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 0.84em;
+  color: var(--syn-ln, #8a9199);
+  opacity: .72;
+}
+.cf-file { color: var(--syn-fn, #dcdcaa); }
+.cf-lang { color: var(--syn-ln, #8a9199); }
+.cf-meta::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: .16;
+}
+
+/* ---------- 主体 ---------- */
+.cf-body { position: absolute; left: 0; right: 0; }
+
+/* 所有档共用：可滚动区只占代码带的上部，底边留给渐隐区。
+   正在打字/正在输出的那一行必须待在完全清晰的位置，
+   不能已经落进渐隐里 —— 否则最新的内容反而最看不清。 */
+.cf-body { bottom: 36%; }
+
+/* 编辑器档：顶对齐，内容往下长，超出后由 JS 设 scrollTop 跟随光标。
+   overflow:hidden 而不是 clip —— clip 会禁止程序滚动。
+   注意：之前这里用 transform: translateY(--cf-shift) 做跟随，
+   但 CSP 的 style-src 会拦内联样式属性；scrollTop 不碰样式，更省心。 */
+.cf-body.is-editor {
+  top: var(--cf-top);
+  overflow: hidden;
+}
+
+/* 终端 / 依赖日志：顶对齐往下长，超出后往上滚（followBottom）。
+   之前这里是 justify-content: flex-end 做底对齐，
+   后果是第一行出现在带子底部然后往上长 —— 就是「从下往上」的观感。 */
+.cf-body.is-terminal,
+.cf-body.is-install {
+  top: var(--cf-top);
+  overflow: hidden;
+  display: block;
+}
+
+/* ---------- 编辑器行 ---------- */
+.cf-body.is-editor { counter-reset: ln; }
+
+.cf-line {
+  position: relative;
+  padding-left: var(--cf-gut);
+  padding-right: 16px;
+  min-height: calc(1em * var(--cf-lh));
+  white-space: pre;
+}
+.cf-line::before {
+  counter-increment: ln;
+  content: counter(ln);
+  position: absolute;
+  left: 0;
+  width: calc(var(--cf-gut) - 14px);
+  text-align: right;
+  color: var(--syn-ln, #8a9199);
+  opacity: 0;
+}
+/* 行号跟着打字一起出现；没打到的行不留行号，避免「空的文档却有 20 行号」 */
+.cf-line.is-started::before { opacity: 1; }
+
+/* 当前行高亮 —— 编辑器的原生行为 */
+.cf-line.is-cur { background: rgba(255,255,255,.035); }
+
+/* 光标：竖条，放在当前 token 的尾部（不能放行尾，因为后面的 token 只是透明了） */
+.cf-t.is-cur::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.06em;
+  margin-right: -2px;
+  vertical-align: -0.16em;
+  background: var(--syn-caret, #aeafad);
+  animation: cf-blink 1.06s steps(1, end) infinite;
+}
+@keyframes cf-blink { 0%, 55% { opacity: 1 } 56%, 100% { opacity: 0 } }
+
+/* 未打到的 token：文本已经在 DOM 里占好位置（所以打字过程中零位移），只是不显示 */
+.cf-t.is-hid { opacity: 0; }
+
+/* 打错：红色波浪下划线，和 VSCode 的报错提示同款。
+   意义不只是好看 —— 它让「打错了」这件事在屏幕上是看得见的，
+   否则观众只会看到字符莫名其妙变少，读不出「作者改了个错」。 */
+.cf-t.is-typo {
+  color: var(--ed-del, #f48771);
+  text-decoration: underline wavy var(--ed-del, #f48771);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* 选中全部（换档时的「全选删除」）—— VSCode 选区蓝
+   注意选择器是 .cf-body.is-selecting：类加在 .cf-body 上，不是 .cf 上。 */
+.cf-body.is-selecting .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* 整行重写：这一行被全选，同样用选区蓝。
+   和「全选删除」是同一个视觉语言 —— 都是「选起来准备动它」。 */
+.cf-line.is-selected .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* ---------- 暂停徽标 ----------
+   用户一开始填表，代码带就停下并挂上这个标记。
+   为什么要显示：动画突然不动会被当成卡死，说清楚「是我故意停的」才不会误解。
+
+   暂停图标用两段 CSS 画的竖条，不用 ⏸ 这类字符 ——
+   它们大多落在 U+23xx 符号区，等宽字体的覆盖很不稳（可能变成豆腐块）。 */
+.cf-hold {
+  /* fixed 到视口：卡片盖住代码带时也能看见（挂在 .cf 外面，见 HTML 注释） */
+  position: fixed;
+  z-index: 4;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, .20);
+  border-radius: 999px;
+  /* ⚠ 徽标自己也是一块玻璃，但它必须比卡片厚得多。
+     徽标是浮在代码带最亮那一段上的（带子顶部），背后常有高亮 token；
+     沿用卡片的淡 tint 时，实测文字对比度只有 3.23:1（320px）。
+     小控件没有余地，所以这里 .90 不透明 + brightness(.7) 压暗背后。
+     卡片可以很透，因为卡片里的文字下方有留白；徽标没有。 */
+  background: rgba(8, 9, 13, .90);
+  -webkit-backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  color: #e8e8e8;
+  font-family: var(--cf-font);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.cf-hold[hidden] { display: none; }
+/* 只在 paused-reduced 之外真正显示；:not([hidden]) 已经挡了，这里再给个渐入 */
+.cf-hold:not([hidden]) { opacity: 1; }
+
+.cf-hold-bars {
+  position: relative;
+  width: 8px;
+  height: 10px;
+  flex: none;
+}
+.cf-hold-bars::before,
+.cf-hold-bars::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 10px;
+  background: currentColor;
+}
+.cf-hold-bars::before { left: 0 }
+.cf-hold-bars::after  { right: 0 }
+
+/* ---------- 终端 / 日志行 ---------- */
+.cf-tline { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cf-body.is-install .cf-tline { padding-left: var(--cf-gut); }
+
+/* ---------- 语法着色（VSCode Dark+ 原生值） ---------- */
+.k-kw { color: var(--syn-kw, #569cd6) }   /* 声明关键字 5.59:1 */
+.k-ct { color: var(--syn-ct, #c586c0) }   /* 控制流     5.92:1 */
+.k-ty { color: var(--syn-ty, #4ec9b0) }   /* 类型       8.09:1 */
+.k-fn { color: var(--syn-fn, #dcdcaa) }   /* 函数       11.66:1 */
+.k-va { color: var(--syn-va, #9cdcfe) }   /* 变量       11.05:1 */
+.k-st { color: var(--syn-st, #ce9178) }   /* 字符串     6.24:1 */
+.k-nu { color: var(--syn-nu, #b5cea8) }   /* 数字       9.70:1 */
+.k-cm { color: var(--syn-cm, #6a9955) }   /* 注释       4.95:1 */
+.k-an { color: var(--syn-an, #dcdcaa) }   /* 注解      11.66:1 */
+.k-pp { color: var(--syn-pp, #569cd6) }   /* 预处理     5.59:1 */
+.k-op { color: var(--syn-op, #d4d4d4) }
+.k-ws { color: inherit }
+
+/* ---------- 终端语义色 ---------- */
+.t-box  { color: var(--syn-ln, #8a9199) }
+.t-cmd  { color: var(--ed-fg, #cccccc) }
+.t-user { color: var(--syn-va, #9cdcfe) }
+.t-say  { color: var(--ed-fg, #cccccc) }
+.t-say::first-letter { color: var(--ed-accent, #4da3e8) }   /* ⏺ */
+.t-note { color: var(--syn-ln, #8a9199) }
+.t-code { color: var(--syn-va, #9cdcfe) }
+.t-add  { color: var(--ed-add, #4ec9b0); background: rgba(78,201,176,.10) }
+.t-del  { color: var(--ed-del, #f48771); background: rgba(244,135,113,.10) }
+.t-think { color: var(--syn-fn, #dcdcaa) }
+.t-log  { color: var(--syn-ln, #8a9199) }
+.t-build { color: var(--syn-ty, #4ec9b0) }
+.t-plain { color: var(--ed-fg, #cccccc) }
+
+/* ---------- 依赖下载的进度条 ----------
+   固定总宽度：填充在长、剩余在短，两者之和恒定，
+   所以右边的标签不会随着进度左右跳动。 */
+.t-bar { white-space: pre; }
+.bar-on  { color: var(--ed-accent, #4da3e8) }
+.bar-off { color: var(--syn-ln, #8a9199); opacity: .3 }
+.bar-lab { color: var(--syn-ln, #8a9199) }
+
+/* 减少动效：一切静止 */
+@media (prefers-reduced-motion: reduce) {
+  .cf-t.is-cur::after { animation: none }
+  .cf-body.is-editor { transition: none }
+}
+
+/* 打印 / 极端降级：不显示代码层 */
+@media print { .cf { display: none } }
+
+/* ============================================================
+   静态对照表用：同一套渲染，但参与文档流（不是固定全屏层）
+   —— 对照表里看到的必须和解效时看到的是同一套东西，
+      否则对照表就是自欺。所以复用的是同一个 paintStatic()。
+   ============================================================ */
+.cf.cf-sheet {
+  position: static;
+  inset: auto;
+  height: auto;
+  contain: none;
+  transform: none;
+  overflow: visible;
+  pointer-events: auto;
+  border: 1px solid var(--ed-border, #2b2b2b);
+  background: var(--ed-bg, #1f1f1f);
+}
+.cf.cf-sheet .cf-meta { position: static; height: auto; padding: 7px 12px; }
+.cf.cf-sheet .cf-body { position: static; transform: none; transition: none; overflow: visible; max-height: none; }
+.cf.cf-sheet .cf-body.is-terminal,
+.cf.cf-sheet .cf-body.is-install { display: block; }
+.cf.cf-sheet .cf-line::before { opacity: 1; }
+
+</style>
+<style data-source="base.css">
+/* ============================================================
+   base.css —— 三个方向的**共同机制**，不含任何风格主张
+
+   放这里的只有三类东西：
+     1. 机制（盒模型、表单排布、可点尺寸、焦点环、打印、减动效）
+     2. 代码场域的几何（三个方向都必须保留这个活体背景）
+     3. 代码场域与内容层的层序契约
+
+   任何「看起来是什么样」的决定都不在这里 —— 那些属于各方向自己的层。
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--sd-sans);
+  font-size: 16px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body > div { position: relative; min-height: 100vh; }
+
+h1, h2, h3 { margin: 0; line-height: 1.22; }
+p { margin: 0; }
+ol, ul { margin: 0; padding: 0; }
+img { max-width: 100%; height: auto; }
+
+a { color: inherit; text-decoration: none; }
+
+/* 焦点环：三个方向都必须有，颜色各自定 */
+:focus-visible {
+  outline: 2px solid var(--sd-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 锚点跳转要避开各自的顶栏/吸顶元素 */
+section[id] { scroll-margin-top: var(--sd-anchor-gap, 72px); }
+
+/* 静态稿没有 app.js：隐藏态要自己保证 */
+[hidden] { display: none !important; }
+/* 也没有 reveal 的观察器：初始态必须是可见的 */
+.reveal { opacity: 1 !important; transform: none !important; }
+
+/* ---------- 可点元素 ≥44px（无障碍硬线，三个方向都不许破） ---------- */
+.btn, .submit, .link-btn, .open-btn, .top-cta, .tab, .nav a,
+.dir-row, .link-card, .chrome a, .rail-i { min-height: 44px; }
+
+/* ---------- 表单机制（样式各自定，排布与尺寸下限在这里） ---------- */
+#app-form { display: grid; gap: 16px; }
+.field { display: grid; gap: 7px; }
+.field.full { grid-column: 1 / -1; }
+.captcha-row { display: grid; gap: 10px; align-items: center; }
+.captcha-img { width: 150px; height: 50px; }
+label { font-size: 14.5px; }
+
+/* 17px：低于 16px 时 iOS 聚焦会缩放整页 —— 这是产品级硬约束，不是偏好 */
+input[type="text"], select, textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1.5;
+}
+textarea { min-height: 92px; resize: vertical; }
+input:disabled, select:disabled, textarea:disabled { opacity: .55; }
+
+@media (min-width: 640px) {
+  .captcha-row { grid-template-columns: 150px 1fr auto; }
+  .join-grid { display: grid; grid-template-columns: 192px 1fr; gap: 18px; align-items: start; }
+}
+.join-grid { display: grid; gap: 18px; }
+.join-info { display: grid; gap: 12px; }
+
+/* ============================================================
+   代码场域：三个方向共用同一套几何与层序
+   （层序：.cf z1 → 内容 z2 → 吸顶/底栏 z4。
+     .cf 内有 transform + contain，fixed 子元素会被困住，
+     所以暂停徽标与固定栏必须挂在 .cf 外面。）
+   ============================================================ */
+
+.cf { height: 100vh; height: 100dvh; }
+.cf .cf-body { top: var(--sd-field-top); bottom: var(--sd-field-bottom, 8%); left: 0; right: 0; width: 100%; }
+
+/* 行号栏与代码之间的竖发丝线 —— 编辑器最省力的签名 */
+.cf-body.is-editor::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(var(--cf-gut) - 8px);
+  width: 1px;
+  background: var(--sd-gutter-line, rgba(255, 255, 255, .08));
+  pointer-events: none;
+}
+
+.cf-meta { top: var(--sd-field-top); }
+.cf-hold {
+  top: calc(var(--sd-field-top) + 8px);
+  right: 12px;
+  font-family: var(--sd-mono);
+  font-size: 11px;
+  border-radius: 2px;
+}
+@media (max-width: 899px) {
+  .cf-body.is-editor::before { left: calc(30px - 6px); }
+}
+
+/* ============================================================
+   固定栏（chrome）与轨道（rail）：只有骨架位置，样式各自定
+   ============================================================ */
+
+.chrome { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; align-items: stretch; }
+.chrome-file, .chrome-phase { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-width: 0; }
+.chrome-file { overflow: hidden; text-overflow: ellipsis; }
+.chrome-sp { flex: 1 1 auto; min-width: 0; }
+
+.rail { position: fixed; z-index: 4; }
+.rail-i { display: flex; align-items: center; }
+
+/* ============================================================
+   降级
+   ============================================================ */
+
+@media print {
+  .cf, .cf-hold, .chrome, .rail, .top { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+</style>
+<style data-source="d2-hazard.css (D2)">
+/* ============================================================
+   D2 · 警戒线 HAZARD —— 一条警戒线拉在机器前面
+
+   主张：**这个页面是被围起来的现场。**
+   安全行业最日常的物件不是终端，是警戒线：它标记「这里发生过事情」。
+   于是全页的结构全部由警戒黄胶带完成 —— 章节是胶带、标签是胶带、
+   报名的动作是胶带；除胶带之外一律骨白到灰，零玻璃、零渐变、零发光。
+
+   风险与它的理由：
+   · 墨黑 + 单一亮色是所有暗色页面的默认长相（我认这条风险）。
+     区分点不在颜色而在**胶带作为结构**：黄色只出现在「分隔、标记、动作」三种
+     语义上，不做装饰、不做发光、不做渐变；正文一律骨白/灰。
+   · 四个方向**不编号**（它们不是序列）；流程**编号 01–04**（它真的是序列）。
+   · 左侧一条固定的警戒黄胶带（带墨色短刻线）—— 页面唯一始终可见的品牌物。
+
+   场域（活代码）仍然是整屏背景，全部保留：见 base.css。
+   ============================================================ */
+
+.sd-d2 {
+  --ink: #0A0A0C;
+  --ink-2: #141416;
+  --ink-3: #1C1C1F;
+  --tape: #F2C200;          /* 警戒黄：只做结构、标记、动作 */
+  --tape-ink: #17130A;
+  --bone: #F4F2EC;
+  --gray: #A8A49C;
+  --gray-2: #A8A49C;   /* 没有第三档：亮底上 3.16:1 的信息字是废字，见实测 */
+
+  --sd-focus: var(--tape);
+  --sd-gutter-line: rgba(244, 242, 236, .10);
+  --sd-field-top: 150px;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --col: max(20px, calc((100vw - 780px) / 2));
+
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.sd-d2 .rail { display: none; }
+
+/* 左侧那条胶带：固定，全高，带墨色短刻线 */
+.sd-d2::before {
+  content: '';
+  position: fixed; left: 0; top: 0; bottom: 0; width: 10px; z-index: 3;
+  background:
+    repeating-linear-gradient(180deg, var(--tape-ink) 0 2px, transparent 2px 26px),
+    var(--tape);
+}
+@media (max-width: 899px) { .sd-d2::before { width: 6px; } }
+
+.sd-d2 .mono, .sd-d2 .h2-en, .sd-d2 .tl-when, .sd-d2 .pane-meta,
+.sd-d2 .hint, .sd-d2 .foot, .sd-d2 .req, .sd-d2 .opt, .sd-d2 .chrome,
+.sd-d2 .h2, .sd-d2 .tl-title, .sd-d2 .pane-name, .sd-d2 .dir-cn, .sd-d2 .chip {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 顶栏：一条押在页面顶部的胶带 ================= */
+
+.sd-d2 .top {
+  position: sticky; top: 0; z-index: 4;
+  background: var(--tape);
+  color: var(--tape-ink);
+}
+.sd-d2 .top-in {
+  display: flex; align-items: stretch; gap: 4px;
+  height: 56px; padding: 0 var(--col);
+  overflow-x: auto; scrollbar-width: none;
+}
+.sd-d2 .top-in::-webkit-scrollbar { display: none; }
+.sd-d2 .tab { display: inline-flex; align-items: center; flex: none; font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.sd-d2 .tab-ext { opacity: .65; }
+.sd-d2 .nav { display: none; align-items: stretch; gap: 2px; }
+.sd-d2 .nav a {
+  display: inline-flex; align-items: center; padding: 0 12px;
+  font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--tape-ink);
+  border-bottom: 3px solid transparent;
+}
+.sd-d2 .nav a:hover { border-bottom-color: var(--tape-ink); }
+.sd-d2 .top-cta {
+  display: inline-flex; align-items: center; margin-left: auto; align-self: center;
+  padding: 0 16px; background: var(--tape-ink); color: var(--tape);
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+}
+.sd-d2 .prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
+.sd-d2 .prog i { display: block; height: 100%; width: 0; background: var(--tape-ink); }
+@media (min-width: 820px) { .sd-d2 .nav { display: flex; } }
+
+/* ================= HERO：直接喊在机器上 ================= */
+
+.sd-d2 .page { position: relative; z-index: 2; padding: 0 0 72px; }
+
+.sd-d2 .hero { padding: clamp(28px, 7vh, 64px) var(--col) clamp(34px, 8vh, 72px); }
+.sd-d2 .hero-in {
+  max-width: 900px;
+  /* 标题压在会动的亮代码上，必须给一块确定性暗底：
+     实测手机端曾出现背后 205,205,205（亮 token），骨白字只剩 1.42:1 */
+  background: radial-gradient(120% 86% at 4% 34%, rgba(10, 10, 12, .92) 0 44%, rgba(10, 10, 12, .66) 70%, transparent 100%);
+  padding: 6px 0;
+}
+.sd-d2 .h1 {
+  font-family: var(--mono);
+  font-size: clamp(34px, 8.4vw, 62px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.08;
+  color: var(--bone);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .8);
+}
+/* 标题下面压的一条胶带 */
+.sd-d2 .h1::after {
+  content: '';
+  display: block;
+  width: min(190px, 42vw);
+  height: 10px;
+  background: var(--tape);
+  margin-top: 18px;
+}
+.sd-d2 .lede {
+  max-width: 44ch;
+  margin: 22px 0 28px;
+  font-size: 16px;
+  color: var(--gray);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, .85);
+}
+.sd-d2 .btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 0 24px; min-height: 50px;
+  background: var(--tape); color: var(--tape-ink);
+  font-family: var(--mono); font-size: 15px; font-weight: 700;
+}
+.sd-d2 .btn::after { content: '↗'; }
+.sd-d2 .btn:hover { background: #FFD400; }
+
+/* ================= 章节 = 整幅胶带封起来的带子 ================= */
+
+.sd-d2 .sec {
+  background: rgba(10, 10, 12, .78);
+  border-top: 10px solid var(--tape);      /* 胶带：章节分隔就是它 */
+  border-bottom: 1px solid rgba(244, 242, 236, .12);
+}
+.sd-d2 .sec + .sec { margin-top: 12px; }   /* 缝 = 一条裸露的活代码，不分段就被自己盖死了 */
+.sd-d2 .shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px var(--col) 40px;
+}
+.sd-d2 .h2 {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  font-size: clamp(20px, 4.6vw, 26px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--bone);
+  margin-bottom: 22px;
+}
+/* 眉标 = 一枚胶带标签 */
+.sd-d2 .h2-en {
+  order: -1; flex-basis: 100%;
+  display: inline-block; width: fit-content;
+  font-size: 11px; font-weight: 700; letter-spacing: .18em;
+  color: var(--tape-ink); background: var(--tape);
+  padding: 3px 8px;
+}
+
+/* ================= 方向：四行，左侧一条会变宽的胶带 ================= */
+
+.sd-d2 .dir-list { display: grid; gap: 2px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .dir-row {
+  position: relative;
+  display: grid; grid-template-columns: 1fr; gap: 3px;
+  padding: 16px 14px 16px 22px;
+  background: rgba(20, 20, 22, .70);   /* 半透明：带子里也要能看见机器在动 */
+  border: 0; font: inherit; text-align: left; cursor: pointer; color: inherit;
+}
+.sd-d2 .dir-idx { display: none; }        /* 方向不是序列，序号是装饰 */
+.sd-d2 .dir-row::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; background: rgba(244, 242, 236, .16);
+  transition: width 140ms ease, background 140ms ease;
+}
+.sd-d2 .dir-row:hover, .sd-d2 .dir-row:focus-visible { background: #1A1A1D; outline: none; }
+.sd-d2 .dir-row:hover::before, .sd-d2 .dir-row:focus-visible::before,
+.sd-d2 .dir-row[aria-pressed="true"]::before { width: 12px; background: var(--tape); }
+.sd-d2 .dir-row[aria-pressed="true"] { background: #1A1A1D; }
+.sd-d2 .dir-cn { font-size: 21px; font-weight: 700; letter-spacing: -.01em; color: var(--bone); }
+.sd-d2 .dir-code { font-family: var(--mono); font-size: 13px; }
+.sd-d2 [data-dir="sw"] .dir-code { color: var(--dir-sw); }
+.sd-d2 [data-dir="hw"] .dir-code { color: var(--dir-hw); }
+.sd-d2 [data-dir="al"] .dir-code { color: var(--dir-al); }
+.sd-d2 [data-dir="ai"] .dir-code { color: var(--dir-ai); }
+.sd-d2 .dir-desc { font-size: 14.5px; color: var(--gray); }
+.sd-d2 #dir-hint { margin-top: 18px; font-size: 12.5px; color: var(--gray-2); }
+
+/* ================= 流程：真的有序，所以 01–04 ================= */
+
+.sd-d2 .tl { list-style: none; display: grid; gap: 2px; }
+.sd-d2 .tl-item {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 16px;
+  padding: 16px;
+  background: rgba(20, 20, 22, .70);
+  counter-increment: tg;
+}
+.sd-d2 .tl { counter-reset: tg; }
+.sd-d2 .tl-item::before { display: none; }
+.sd-d2 .tl-when {
+  grid-column: 1; grid-row: 1 / span 3;
+  font-size: 26px; font-weight: 700; color: var(--gray-2);
+  letter-spacing: -.03em; min-width: 48px;
+}
+.sd-d2 .tl-when::before { content: counter(tg, decimal-leading-zero); }
+.sd-d2 .tl-when { font-size: 0; }
+.sd-d2 .tl-when::before { font-size: 26px; }
+.sd-d2 .tl-title { grid-column: 2; font-size: 18px; color: var(--bone); margin-bottom: 3px; }
+.sd-d2 .tl-desc { grid-column: 2; font-size: 14.5px; color: var(--gray); }
+.sd-d2 .tl-desc strong { color: var(--bone); }
+.sd-d2 .tl-item[data-phase="warmup"] { box-shadow: inset 4px 0 0 var(--tape); }
+.sd-d2 .tl-item[data-phase="warmup"] .tl-when::before { color: var(--tape); }
+.sd-d2 .tl-item[data-phase="warmup"] .tl-title::after {
+  content: '进行中'; margin-left: 10px;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  background: var(--tape); color: var(--tape-ink); padding: 3px 7px;
+}
+
+.sd-d2 .h3 {
+  font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--tape); margin: 28px 0 10px;
+}
+.sd-d2 .notice-list { display: grid; gap: 1px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .notice-list > * { background: var(--ink-2); padding: 16px; }
+.sd-d2 .notice h3 { font-size: 17px; color: var(--bone); margin-bottom: 4px; }
+.sd-d2 .notice-meta { font-family: var(--mono); font-size: 11.5px; color: var(--gray-2); margin-bottom: 8px; }
+.sd-d2 .notice-body { font-size: 14.5px; color: var(--gray); }
+.sd-d2 .notice.pinned { box-shadow: inset 4px 0 0 var(--tape); }
+
+/* ================= 报名表：一块夹在胶带里的板子 ================= */
+
+.sd-d2 .pane {
+  background: #101012;
+  border: 1px solid rgba(244, 242, 236, .16);
+}
+.sd-d2 .pane-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--tape); color: var(--tape-ink);
+  font-size: 13px; font-weight: 700;
+}
+.sd-d2 .pane-name { font-size: 14px; }
+.sd-d2 .pane-meta { margin-left: auto; font-size: 12px; }
+.sd-d2 .pane-meta .mono { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.sd-d2 .pane-meter { height: 4px; background: rgba(244, 242, 236, .14); }
+.sd-d2 .pane-meter i { display: block; height: 100%; width: 0; background: var(--tape); }
+.sd-d2 .pane-body { padding: 22px 16px 24px; }
+
+.sd-d2 .field label { display: flex; align-items: baseline; gap: 6px; color: var(--bone); font-weight: 600; font-size: 14px; }
+.sd-d2 .req { color: var(--tape); font-weight: 700; }
+.sd-d2 .opt { color: var(--gray-2); font-size: 11px; letter-spacing: .06em; }
+
+.sd-d2 input[type="text"], .sd-d2 select, .sd-d2 textarea {
+  background: #08080A; color: var(--bone);
+  border: 1px solid rgba(244, 242, 236, .20);
+  border-radius: 0; font-family: var(--mono); font-size: 16px;
+}
+.sd-d2 input::placeholder, .sd-d2 textarea::placeholder { color: var(--gray-2); }
+.sd-d2 input:focus, .sd-d2 select:focus, .sd-d2 textarea:focus {
+  outline: none; border-color: var(--tape);
+  box-shadow: 0 0 0 3px rgba(242, 194, 0, .22);
+}
+.sd-d2 textarea { font-family: var(--mono); }
+
+.sd-d2 .captcha-img { border: 1px solid rgba(244, 242, 236, .2); background: #fff; }
+.sd-d2 .link-btn {
+  background: none; border: 1px solid var(--tape); color: var(--tape);
+  font-family: var(--mono); font-size: 12.5px; padding: 0 10px; cursor: pointer;
+}
+.sd-d2 .submit {
+  min-height: 52px; padding: 0 28px;
+  background: var(--tape); color: var(--tape-ink);
+  border: 0; font-family: var(--mono); font-size: 15px; font-weight: 700;
+  cursor: pointer;
+}
+.sd-d2 .submit:hover { background: #FFD400; }
+.sd-d2 .form-status { font-family: var(--mono); font-size: 12.5px; color: var(--gray); }
+.sd-d2 .form-foot { font-size: 12.5px; color: var(--gray-2); }
+
+.sd-d2 .banner, .sd-d2 .edit-banner {
+  padding: 14px; margin-bottom: 16px;
+  background: #15161A; border: 1px solid rgba(244, 242, 236, .16);
+  box-shadow: inset 4px 0 0 var(--tape);
+  font-size: 14px; color: var(--gray);
+}
+.sd-d2 #device-card { box-shadow: inset 4px 0 0 var(--gray-2); }
+.sd-d2 .token-panel {
+  margin-top: 20px; padding: 20px 16px;
+  background: #15161A; border: 1px solid rgba(244, 242, 236, .16);
+  box-shadow: inset 4px 0 0 var(--dir-ai);
+}
+.sd-d2 .token-panel h3 { font-size: 17px; margin-bottom: 8px; }
+.sd-d2 .token-note, .sd-d2 .token-warn { font-size: 13.5px; color: var(--gray); }
+.sd-d2 .token-note strong { color: var(--bone); }
+.sd-d2 .token-warn { color: var(--tape); }
+.sd-d2 .token-box {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 12px;
+  background: #08080A; border: 1px solid rgba(244, 242, 236, .2);
+}
+.sd-d2 .token-box code { flex: 1; min-width: 0; font-family: var(--mono); font-size: 15px; color: var(--dir-ai); overflow-wrap: anywhere; }
+
+/* ================= 加群 / 友链 / 页脚 ================= */
+
+.sd-d2 .qr {
+  display: grid; place-items: center; gap: 8px; padding: 14px; min-height: 168px;
+  background: #0E0E10; border: 1px dashed rgba(244, 242, 236, .22);
+}
+.sd-d2 .qr img { width: 150px; height: 150px; background: #fff; }
+.sd-d2 #qr-fallback { text-align: center; font-size: 12px; color: var(--gray-2); max-width: 22ch; }
+.sd-d2 .join-info p { font-size: 14.5px; color: var(--gray); }
+.sd-d2 .warn { color: var(--tape); }
+.sd-d2 .warn strong { color: var(--bone); }
+
+.sd-d2 .link-list { display: grid; gap: 1px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .link-card { display: grid; gap: 6px; background: var(--ink-2); padding: 14px 16px; cursor: pointer; }
+.sd-d2 .link-card:hover { background: #1A1A1D; }
+.sd-d2 .link-card .name { display: flex; justify-content: space-between; gap: 10px; color: var(--bone); font-size: 15px; font-weight: 600; }
+.sd-d2 .link-card .chev { font-family: var(--mono); color: var(--gray-2); transition: transform 160ms ease; }
+.sd-d2 .link-card[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.sd-d2 .link-card .desc { font-size: 12.5px; color: var(--gray); }
+.sd-d2 .link-card[aria-expanded="false"] .desc,
+.sd-d2 .link-card[aria-expanded="false"] .open-btn { display: none; }
+.sd-d2 .open-btn {
+  display: inline-flex; align-items: center; justify-self: start; padding: 0 12px;
+  font-family: var(--mono); font-size: 12.5px; color: var(--tape-ink);
+  background: var(--tape); border: 0;
+}
+.sd-d2 .foot {
+  margin-top: 30px; padding-top: 16px;
+  border-top: 6px solid var(--tape);
+  font-size: 11.5px; color: var(--gray-2);
+}
+
+/* ================= 固定栏：押在底部的带子 ================= */
+
+.sd-d2 .chrome {
+  background: var(--ink-2);
+  border-top: 6px solid var(--tape);
+  color: var(--gray);
+  font-size: 12px;
+}
+.sd-d2 .chrome-file, .sd-d2 .chrome-phase { padding: 0 14px; }
+.sd-d2 .chrome-dot { width: 7px; height: 7px; background: var(--tape); }
+.sd-d2 .chrome-link {
+  display: inline-flex; align-items: center; padding: 0 16px;
+  color: var(--gray); border-left: 1px solid rgba(244, 242, 236, .16);
+}
+.sd-d2 .chrome-link:hover { color: var(--tape); }
+.sd-d2 .chrome-cta { background: var(--tape); color: var(--tape-ink); font-weight: 700; }
+
+</style>
+</head>
+<body>
+<div class="sd sd-d2">
+  <div class="cf" id="cf-root" data-mode="editor" data-dir="sw" aria-hidden="true">
+    <div class="cf-meta"><span class="cf-file">AuthController.java</span><span class="cf-lang">java</span></div>
+    <div class="cf-body is-editor"></div>
+  </div>
+  <span class="cf-hold" hidden="">
+    <i class="cf-hold-bars" aria-hidden="true"></i>
+    <span class="cf-hold-text">已暂停</span>
+  </span>
+  <div class="rail" aria-hidden="true">
+    <span class="rail-i" data-phase="warmup">预热</span>
+    <span class="rail-i" data-phase="signup">报名</span>
+    <span class="rail-i" data-phase="review">初筛面试</span>
+    <span class="rail-i" data-phase="result">结果</span>
+  </div>
+<header class="top">
+    <div class="top-in">
+      <a class="tab" href="#hero" id="link-01-网络攻防与信息安全-md">
+        <span class="tab-name">网络攻防与信息安全</span><span class="tab-ext">.md</span>
+      </a>
+      
+      <nav class="nav" aria-label="页内导航">
+        <a href="#directions" aria-current="true" id="link-02-方向">方向</a>
+        <a href="#flow" id="link-03-流程">流程</a>
+        <a href="#apply" id="link-04-报名">报名</a>
+        <a href="#join" id="link-05-加群">加群</a>
+      </nav>
+      <a class="top-cta" href="#apply" id="link-06-报名">报名</a>
+    </div>
+    <div class="prog" aria-hidden="true"><i id="prog-fill" style="transform: scaleX(0);"></i></div>
+  </header>
+<main class="page">
+
+    <!-- ============ HERO ============ -->
+    <section class="hero visible" id="hero">
+      <div class="hero-in">
+        <h1 class="h1">网络攻防与信息安全</h1>
+
+        <p class="lede">攻击与防御，是同一门手艺 —— 欢迎来实验室一起折腾。背后那些不是装饰，是真的在跑的代码：逐字打出来，打错了会删掉重打，改主意了整行重写。</p>
+
+        <a class="btn" href="#directions" id="link-07-看看四个方向">看看四个方向</a>
+      </div>
+    </section>
+
+    <!-- ============ 研究方向 ============ -->
+    <section class="sec visible" id="directions">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">DIRECTIONS</span>你想做什么？</h2>
+
+        <div class="dir-list">
+          <button class="dir-row reveal visible" data-direction="软件" data-dir="sw" type="button" style="--i: 0;">
+            <span class="dir-cn">软件</span>
+            <span class="dir-idx" aria-hidden="true">01</span>
+            <span class="dir-code">+ strncpy(buf, input, n-1)</span>
+            <span class="dir-desc">写代码 · 修漏洞 · 逆向分析</span>
+          </button>
+
+          <button class="dir-row reveal visible" data-direction="硬件" data-dir="hw" type="button" style="--i: 1;">
+            <span class="dir-cn">硬件</span>
+            <span class="dir-idx" aria-hidden="true">02</span>
+            <span class="dir-code">+ verify(firmware)</span>
+            <span class="dir-desc">拆设备 · 焊板子 · 跑固件</span>
+          </button>
+
+          <button class="dir-row reveal visible" data-direction="算法" data-dir="al" type="button" style="--i: 2;">
+            <span class="dir-cn">算法</span>
+            <span class="dir-idx" aria-hidden="true">03</span>
+            <span class="dir-code">+ 2^32 次 · 生日碰撞</span>
+            <span class="dir-desc">数学是武器，也是防线</span>
+          </button>
+
+          <button class="dir-row reveal" data-direction="人工智能" data-dir="ai" type="button" style="--i: 3;">
+            <span class="dir-cn">人工智能</span>
+            <span class="dir-idx" aria-hidden="true">04</span>
+            <span class="dir-code">+ predict(x + 0.01)</span>
+            <span class="dir-desc">用 AI 攻，也用 AI 守</span>
+          </button>
+        </div>
+
+        <p class="hint" id="dir-hint">点一行，方向会自动填进报名表。</p>
+      </div>
+    </section>
+
+    <!-- ============ 流程 + 公告 ============ -->
+    <section class="sec" id="flow">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">FLOW</span>接下来会发生什么</h2>
+
+        <ol class="tl" id="tl-list">
+          <li class="tl-item reveal tl-active" data-phase="warmup" style="--i: 0;">
+            <span class="tl-when">现在</span>
+            <h3 class="tl-title">预热了解</h3>
+            <p class="tl-desc">加入招新群，了解实验室日常与研究方向。群里只做通知，不作为报名依据。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="signup" style="--i: 1;">
+            <span class="tl-when">国庆假期后</span>
+            <h3 class="tl-title">正式报名</h3>
+            <p class="tl-desc">网站开放完整报名表，群内同步发布链接与截止时间。<strong>所有人必须通过本页面提交</strong>，群接龙、私聊都不算报名。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="review" style="--i: 2;">
+            <span class="tl-when">报名截止后</span>
+            <h3 class="tl-title">初筛与面试</h3>
+            <p class="tl-desc">我们审阅报名表并筛出面试名单。面试安排将在招新群内公布。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="result" style="--i: 3;">
+            <span class="tl-when">面试结束后</span>
+            <h3 class="tl-title">结果公布</h3>
+            <p class="tl-desc">录取名单在招新群内公布。</p>
+          </li>
+        </ol>
+
+        <div class="notices">
+          <h3 class="h3">公告</h3>
+          <div id="notice-list" class="notice-list reveal"><article class="notice pinned"><h3>招新预热中</h3><p class="notice-meta">置顶 · <span class="mono">9月11日 10:01</span></p><p class="notice-body">实验室招新即将开始。正式报名预计在国庆假期后开放，具体时间会在招新群内和本页面同步通知。
+
+欢迎先加入招新群了解实验室的日常。</p></article></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 报名 ============ -->
+    <section class="sec apply" id="apply">
+      <div class="shell">
+        <!-- 文档面：比纸面略深的一块底板，标题栏写清这是什么 -->
+        <div class="pane">
+          <div class="pane-bar">
+            <span class="pane-name">报名表</span>
+            <span class="pane-meta"><span class="mono" id="doc-progress">0 / 9</span> 必填项</span>
+          </div>
+          <!-- 完成度读数：一条随必填项推进的线 -->
+          <div class="pane-meter" aria-hidden="true"><i id="meter-fill" style="transform: scaleX(0);"></i></div>
+
+          <div class="pane-body">
+            <!-- 报名未开放时的提示条 -->
+            <div id="phase-banner" class="banner"><strong>报名尚未开放</strong>　预计 10月8日 10:00 开放。可以先加入下方招新群，开放时会第一时间在群里通知。</div>
+
+            <!-- 本设备已提交过的记录 -->
+            <div id="device-card" class="banner" hidden=""></div>
+
+            <!-- 编辑模式提示条 -->
+            <div id="edit-banner" class="edit-banner" hidden="">
+              <span id="edit-banner-text"></span>
+              <button type="button" id="edit-cancel" class="link-btn">退出修改</button>
+            </div>
+
+            <form id="app-form" novalidate="" class="is-closed">
+              <div class="field">
+                <label for="student_id">学号 <span class="req">*</span></label>
+                <input type="text" id="student_id" name="student_id" required="" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="2026xxxxxx" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="name">姓名 <span class="req">*</span></label>
+                <input type="text" id="name" name="name" required="" autocomplete="name" maxlength="20" placeholder="你的名字" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="class_name">班级 <span class="req">*</span></label>
+                <input type="text" id="class_name" name="class_name" required="" maxlength="30" placeholder="如：网络工程 2 班" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="major">专业 <span class="req">*</span></label>
+                <input type="text" id="major" name="major" required="" maxlength="30" placeholder="如：网络工程 / 计算机科学与技术" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="contact_type">联系方式类型 <span class="req">*</span></label>
+                <select id="contact_type" name="contact_type" required="" disabled="">
+                  <option value="" disabled="" selected="">选择类型</option>
+                  <option value="wechat">微信号</option>
+                  <option value="phone">手机号</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="contact">联系方式 <span class="req">*</span></label>
+                <input type="text" id="contact" name="contact" required="" maxlength="50" autocomplete="off" placeholder="微信号或手机号" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="direction">方向 <span class="req">*</span></label>
+                <select id="direction" name="direction" required="" disabled="">
+                  <option value="" disabled="" selected="">选择方向</option>
+                  <option value="软件">软件</option>
+                  <option value="硬件">硬件</option>
+                  <option value="算法">算法</option>
+                  <option value="人工智能">人工智能</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="captcha_answer">人机验证 <span class="req">*</span></label>
+                <div class="captcha-row">
+                  <img id="captcha-img" class="captcha-img" alt="验证码（点击可更换）" width="150" height="50" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%2250%22%20viewBox%3D%220%2C0%2C150%2C50%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23f4f4f4%22%2F%3E%3Cpath%20fill%3D%22%23e7597d%22%20d%3D%22M86.47%2020.65L86.53%2020.71L85.22%2020.75L85.16%2020.69Q83.53%2020.95%2083.34%2022.57L83.21%2022.44L83.23%2022.46Q83.12%2022.99%2083.15%2023.79L83.31%2023.95L83.28%2023.91Q83.26%2025.42%2084.27%2026.50L84.24%2026.47L84.19%2026.41Q85.26%2027.54%2086.78%2027.42L86.90%2027.54L86.88%2027.51Q88.51%2027.38%2089.13%2026.64L89.09%2026.61L89.12%2026.64Q89.88%2025.80%2090.09%2024.00L90.12%2024.02L90.22%2024.13Q90.28%2022.17%2089.27%2021.50L89.30%2021.53L89.28%2021.51Q88.60%2020.89%2086.46%2020.64ZM91.41%2028.16L91.45%2028.20L90.24%2029.87L90.24%2029.86Q88.25%2033.90%2085.22%2037.17L85.18%2037.14L85.05%2037.00Q83.89%2037.29%2081.72%2037.93L81.69%2037.90L81.65%2037.85Q85.97%2032.84%2088.51%2028.99L88.54%2029.02L88.53%2029.01Q87.59%2029.42%2086.27%2029.48L86.29%2029.49L86.28%2029.49Q83.99%2029.74%2082.77%2028.15L82.69%2028.06L82.74%2028.12Q81.70%2026.77%2080.82%2023.10L80.76%2023.05L80.90%2023.19Q80.74%2022.66%2080.62%2021.91L80.71%2022.00L80.68%2021.98Q80.58%2021.24%2080.58%2020.88L80.64%2020.94L80.54%2020.84Q80.54%2019.40%2081.39%2018.91L81.45%2018.96L81.52%2019.03Q82.38%2018.30%2083.88%2018.30L83.99%2018.42L83.84%2018.27Q86.56%2018.41%2086.56%2018.41L86.47%2018.33L86.53%2018.39Q88.29%2018.44%2089.30%2018.59L89.21%2018.49L89.26%2018.55Q90.85%2018.63%2091.58%2019.03L91.58%2019.03L91.63%2019.08Q92.78%2019.74%2092.93%2021.15L92.95%2021.17L93.03%2021.24Q92.95%2021.35%2092.80%2023.49L92.87%2023.57L92.73%2023.43Q92.52%2025.23%2092.33%2025.90L92.35%2025.92L92.36%2025.93Q91.98%2026.99%2091.37%2028.12ZM93.00%2030.14L92.90%2030.05L92.94%2030.09Q93.76%2028.34%2094.19%2024.88L94.05%2024.74L94.17%2024.87Q94.30%2023.00%2094.27%2022.30L94.28%2022.32L94.32%2022.36Q94.35%2020.91%2093.40%2020.18L93.32%2020.10L93.02%2019.95L93.12%2020.06Q92.86%2019.40%2092.13%2018.88L92.20%2018.95L92.14%2018.89Q90.30%2018.09%2086.45%2017.97L86.35%2017.87L86.45%2017.97Q85.63%2017.92%2083.68%2017.92L83.68%2017.93L83.77%2018.02Q82.26%2017.90%2081.06%2018.46L81.02%2018.42L81.10%2018.49Q80.26%2019.21%2080.32%2020.68L80.29%2020.65L80.32%2020.68Q80.41%2021.35%2080.56%2022.97L80.66%2023.07L80.60%2023.01Q81.04%2025.07%2081.26%2025.75L81.29%2025.78L81.18%2025.67Q81.76%2027.29%2082.52%2028.33L82.45%2028.25L82.42%2028.23Q82.61%2028.48%2082.92%2028.79L82.99%2028.85L83.05%2028.92Q83.30%2029.32%2083.82%2030.05L83.69%2029.92L83.78%2030.01Q84.89%2031.03%2086.45%2031.18L86.60%2031.34L86.44%2031.17Q85.03%2033.43%2083.77%2034.96L83.82%2035.01L80.77%2038.38L80.88%2038.49Q82.71%2037.91%2084.02%2037.63L83.86%2037.46L83.87%2037.47Q83.41%2038.33%2082.15%2039.71L82.05%2039.61L82.09%2039.64Q84.46%2038.80%2086.97%2038.77L87.06%2038.86L87.01%2038.82Q88.85%2036.70%2092.34%2030.89L92.44%2031.00L92.33%2030.95L92.44%2031.06Q92.68%2030.50%2092.95%2030.10ZM87.98%2022.52L88.00%2022.55L88.04%2022.59Q88.52%2022.48%2088.88%2022.58L89.01%2022.71L88.92%2022.62Q89.43%2022.69%2089.73%2022.78L89.85%2022.90L89.79%2022.84Q89.93%2023.19%2089.99%2023.53L89.90%2023.44L89.95%2023.49Q89.92%2023.74%2089.83%2024.04L89.80%2024.02L89.87%2024.08Q89.87%2025.49%2088.93%2026.38L88.86%2026.31L88.96%2026.42Q88.04%2027.08%2086.72%2027.05L86.77%2027.10L86.78%2027.11Q86.56%2027.23%2085.34%2026.98L85.16%2026.81L85.30%2026.95Q85.12%2026.24%2085.12%2025.66L85.06%2025.60L84.98%2025.52Q85.09%2025.48%2085.09%2025.30L85.02%2025.23L85.07%2025.28Q85.03%2023.46%2086.86%2022.82L86.84%2022.80L86.81%2022.77Q87.34%2022.56%2088.02%2022.56Z%22%2F%3E%3Cpath%20d%3D%22M14%2017%20C71%2036%2C54%2045%2C147%2030%22%20stroke%3D%22%23eccf78%22%20fill%3D%22none%22%2F%3E%3Cpath%20fill%3D%22%23e56fe5%22%20d%3D%22M34.83%2038.35L34.86%2038.38L34.78%2038.30Q33.17%2038.07%2031.42%2037.94L31.43%2037.95L31.36%2037.88Q30.22%2036.74%2028.08%2033.65L28.16%2033.73L28.04%2033.62Q26.25%2036.07%2024.32%2038.03L24.26%2037.96L22.58%2038.28L22.59%2038.29Q21.76%2038.47%2020.97%2038.68L21.09%2038.81L20.96%2038.68Q24.29%2035.34%2026.71%2032.04L26.90%2032.23L26.79%2032.12Q24.25%2028.84%2019.90%2024.99L19.79%2024.87L19.87%2024.95Q21.65%2025.54%2023.82%2025.87L23.80%2025.85L23.80%2025.86Q26.55%2028.33%2028.08%2030.50L28.06%2030.48L28.05%2030.48Q29.73%2027.99%2031.93%2025.97L31.97%2026.01L32.06%2026.10Q34.52%2025.84%2035.99%2025.44L35.87%2025.32L35.89%2025.34Q32.29%2028.32%2029.33%2031.99L29.31%2031.98L29.31%2031.97Q31.91%2035.61%2034.69%2038.21ZM37.03%2024.71L37.14%2024.81L37.11%2024.78Q34.78%2025.46%2031.94%2025.73L31.95%2025.75L31.81%2025.61Q29.50%2027.76%2028.12%2029.74L28.13%2029.76L28.19%2029.81Q27.45%2028.95%2026.13%2027.36L26.29%2027.51L26.09%2027.47L26.06%2027.44Q25.88%2027.36%2025.79%2027.36L25.83%2027.39L25.80%2027.36Q25.29%2026.79%2023.98%2025.63L23.91%2025.57L23.80%2025.46Q20.98%2025.08%2018.68%2024.10L18.67%2024.09L18.67%2024.09Q23.22%2028.06%2026.47%2032.19L26.47%2032.19L26.50%2032.23Q23.74%2035.89%2020.19%2039.35L20.09%2039.25L20.11%2039.26Q20.43%2039.31%2023.24%2038.63L23.16%2038.56L23.10%2038.49Q21.92%2039.61%2020.61%2040.68L20.67%2040.75L20.64%2040.71Q23.21%2039.98%2025.75%2039.82L25.72%2039.79L25.79%2039.87Q27.57%2037.92%2029.10%2035.71L29.15%2035.76L29.09%2035.70Q30.36%2037.24%2031.34%2038.19L31.37%2038.23L31.37%2038.22Q31.31%2038.08%2031.37%2038.14L31.47%2038.24L31.65%2038.26L31.69%2038.31Q32.61%2039.10%2033.68%2039.95L33.63%2039.90L33.70%2039.98Q36.60%2040.43%2038.92%2041.25L38.83%2041.16L38.79%2041.12Q33.98%2037.68%2031.01%2033.52L30.96%2033.48L30.91%2033.42Q33.86%2029.39%2037.53%2026.12L37.55%2026.14L37.64%2026.23Q36.90%2026.53%2036.10%2026.71L35.93%2026.55L34.35%2026.95L34.41%2027.01Q35.35%2026.27%2037.09%2024.77Z%22%2F%3E%3Cpath%20fill%3D%22%233fcfcf%22%20d%3D%22M58.37%2028.88L58.36%2028.87L58.53%2029.04Q56.45%2028.89%2055.38%2029.86L55.40%2029.89L55.30%2029.78Q54.15%2030.69%2054.40%2032.71L54.49%2032.80L54.57%2032.88Q54.69%2034.78%2055.67%2035.79L55.81%2035.93L55.80%2035.92Q56.64%2036.97%2058.36%2036.91L58.25%2036.80L58.22%2036.78Q58.82%2036.91%2058.97%2036.91L58.92%2036.87L58.85%2036.79Q61.65%2036.26%2061.75%2032.56L61.91%2032.73L61.75%2032.57Q61.79%2030.65%2061.24%2030.01L61.25%2030.02L61.31%2030.08Q60.53%2029.12%2058.48%2029.00ZM61.18%2038.45L61.14%2038.42L61.11%2038.38Q60.05%2038.85%2058.80%2038.79L58.78%2038.78L58.85%2038.85Q55.68%2038.91%2054.63%2036.83L54.75%2036.94L54.69%2036.89Q54.58%2041.21%2053.51%2044.64L53.43%2044.56L53.38%2044.51Q52.04%2045.01%2050.73%2045.59L50.60%2045.46L50.73%2045.59Q52.83%2040.84%2052.61%2035.24L52.63%2035.25L52.49%2035.11Q52.39%2029.72%2050.07%2024.86L50.03%2024.82L50.06%2024.85Q51.64%2025.83%2053.02%2026.19L52.97%2026.14L53.31%2027.25L53.44%2027.38Q53.53%2027.65%2053.75%2028.54L53.62%2028.41L53.63%2028.42Q54.49%2026.81%2057.37%2026.66L57.44%2026.73L57.33%2026.62Q58.07%2026.62%2058.77%2026.62L58.81%2026.66L59.22%2026.67L59.19%2026.64Q59.28%2026.64%2059.43%2026.67L59.49%2026.73L59.71%2026.71L59.67%2026.66Q61.39%2026.95%2061.97%2027.13L62.00%2027.16L61.89%2027.04Q63.21%2027.55%2063.92%2028.31L63.74%2028.13L63.76%2028.16Q64.45%2029.12%2064.42%2030.25L64.48%2030.31L64.43%2030.26Q64.54%2032.67%2063.90%2034.81L63.81%2034.72L63.80%2034.71Q63.09%2037.64%2061.19%2038.46ZM64.59%2038.93L64.48%2038.78L64.43%2038.74Q65.45%2037.27%2065.69%2033.97L65.60%2033.88L65.69%2033.97Q65.82%2032.57%2065.82%2031.56L65.71%2031.45L65.77%2031.51Q65.77%2030.29%2065.16%2029.15L65.15%2029.15L65.27%2029.26Q64.86%2028.83%2064.46%2028.52L64.37%2028.43L64.38%2028.34L64.14%2028.01L64.15%2027.93L64.18%2027.96Q62.78%2026.31%2059.29%2026.31L59.17%2026.19L58.86%2026.38L58.77%2026.28Q54.95%2026.20%2053.64%2027.48L53.78%2027.63L53.81%2027.65Q53.60%2027.17%2053.47%2026.77L53.40%2026.69L53.24%2025.89L53.17%2025.82Q51.18%2025.33%2049.40%2024.14L49.42%2024.15L49.39%2024.12Q52.14%2029.32%2052.38%2035.13L52.30%2035.05L52.27%2035.02Q52.45%2040.79%2050.15%2045.99L50.15%2045.99L51.81%2045.35L51.85%2045.39Q51.56%2045.90%2051.01%2047.16L51.17%2047.32L51.06%2047.21Q53.18%2046.30%2055.05%2046.02L55.15%2046.13L55.23%2046.20Q55.97%2042.17%2056.09%2039.17L56.05%2039.13L56.18%2039.26Q57.28%2040.42%2060.18%2040.61L60.23%2040.65L60.10%2040.52Q63.30%2040.75%2064.46%2038.80L64.52%2038.85ZM60.04%2030.82L59.96%2030.75L60.06%2030.85Q60.57%2030.78%2061.46%2031.05L61.38%2030.98L61.42%2031.01Q61.63%2031.81%2061.60%2032.75L61.48%2032.63L61.51%2032.67Q61.56%2033.44%2061.40%2033.96L61.32%2033.88L61.33%2033.89Q60.81%2036.28%2058.80%2036.53L58.78%2036.51L58.84%2036.48L58.84%2036.48Q58.93%2036.63%2058.84%2036.66L58.79%2036.62L58.23%2036.48L58.33%2036.58Q57.43%2036.63%2056.64%2036.24L56.53%2036.13L56.30%2034.52L56.34%2034.56Q56.18%2032.66%2057.22%2031.83L57.12%2031.73L57.25%2031.86Q57.96%2030.89%2059.89%2030.68Z%22%2F%3E%3Cpath%20d%3D%22M13%2040%20C82%2034%2C56%2039%2C146%2034%22%20stroke%3D%22%23ca7ae5%22%20fill%3D%22none%22%2F%3E%3Cpath%20fill%3D%22%23e1c369%22%20d%3D%22M119.52%2029.82L119.36%2029.66L119.37%2029.67Q119.31%2028.73%20117.75%2028.15L117.77%2028.16L117.72%2028.11Q117.34%2027.98%20116.92%2027.98L116.97%2028.04L116.95%2028.01Q115.85%2028.02%20114.99%2028.48L115.09%2028.57L114.96%2028.44Q113.90%2029.07%20113.99%2030.05L114.03%2030.08L114.08%2030.13Q114.31%2032.35%20114.19%2034.16L114.22%2034.19L114.15%2034.12Q113.95%2036.00%20113.37%2038.02L113.36%2038.01L113.49%2038.14Q111.78%2038.54%20110.84%2038.88L110.74%2038.79L110.75%2038.79Q111.97%2035.83%20111.97%2032.61L112.01%2032.65L112.12%2032.76Q112.02%2028.29%20109.94%2024.71L109.95%2024.72L110.07%2024.84Q111.04%2025.23%20112.97%2025.81L112.90%2025.74L112.93%2025.77Q113.12%2026.30%20113.43%2027.52L113.42%2027.52L113.37%2027.47Q114.48%2025.83%20117.60%2025.89L117.56%2025.84L117.63%2025.92Q118.78%2025.90%20119.43%2026.00L119.56%2026.13L119.49%2026.05Q121.86%2026.35%20121.92%2027.97L122.01%2028.06L121.82%2027.87Q121.87%2028.62%20121.72%2029.45L121.74%2029.47L121.83%2029.56Q121.51%2031.63%20121.66%2034.04L121.50%2033.89L121.52%2033.90Q121.73%2036.29%20122.53%2038.34L122.45%2038.26L122.57%2038.38Q121.06%2037.91%20119.68%2037.79L119.83%2037.93L119.79%2037.90Q119.36%2035.94%20119.30%2033.80L119.22%2033.72L119.41%2033.90Q119.27%2031.62%20119.45%2029.75ZM119.52%2038.20L119.49%2038.17L119.37%2038.06Q120.11%2038.15%20121.15%2038.34L121.22%2038.40L121.41%2039.15L121.52%2039.25Q121.51%2039.49%20121.70%2039.92L121.86%2040.09L121.76%2039.99Q123.68%2040.41%20125.86%2041.36L125.70%2041.21L125.75%2041.25Q123.89%2038.78%20123.34%2035.72L123.36%2035.74L123.37%2035.75Q123.11%2034.06%20123.20%2031.09L123.19%2031.07L123.07%2030.96Q123.18%2030.82%20123.21%2030.18L123.10%2030.07L123.12%2030.09Q123.28%2029.69%20123.21%2029.29L123.10%2029.18L123.09%2029.17Q123.10%2027.92%20122.21%2027.53L122.25%2027.56L122.23%2027.55Q121.98%2026.75%20121.37%2026.26L121.51%2026.39L121.44%2026.32Q120.12%2025.56%20117.68%2025.62L117.68%2025.63L117.69%2025.63Q116.09%2025.57%20115.42%2025.72L115.48%2025.78L115.44%2025.75Q114.36%2026.10%20113.59%2026.83L113.56%2026.80L113.56%2026.80Q113.36%2026.26%20113.05%2025.44L113.05%2025.44L113.08%2025.46Q110.89%2024.99%20109.42%2024.19L109.46%2024.22L109.39%2024.16Q111.95%2028.18%20111.95%2032.80L111.87%2032.72L111.79%2032.65Q111.90%2036.27%20110.37%2039.36L110.36%2039.35L110.31%2039.30Q110.80%2038.99%20111.84%2038.69L111.94%2038.80L111.85%2038.70Q111.46%2039.72%20111.03%2040.52L111.03%2040.51L111.10%2040.58Q112.12%2040.11%20114.97%2039.65L115.00%2039.68L114.98%2039.66Q115.92%2035.68%20115.83%2031.79L115.72%2031.68L115.75%2031.71Q115.66%2030.98%20116.61%2030.40L116.74%2030.53L116.67%2030.46Q117.42%2029.86%20118.31%2029.77L118.48%2029.95L118.49%2029.96Q118.85%2029.91%20119.18%2030.07L119.03%2029.91L119.01%2029.90Q119.07%2032.12%20119.10%2034.17L118.94%2034.02L119.00%2034.08Q118.98%2036.04%20119.37%2038.06Z%22%2F%3E%3Cpath%20d%3D%22M8%2029%20C75%2024%2C59%204%2C143%205%22%20stroke%3D%22%234fe2bd%22%20fill%3D%22none%22%2F%3E%3C%2Fsvg%3E">
+                  <input type="text" id="captcha_answer" name="captcha_answer" required="" maxlength="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入图中字符" disabled="">
+                  <button type="button" id="captcha-refresh" class="link-btn" disabled="">换一张</button>
+                </div>
+              </div>
+
+              <div class="field full">
+                <label for="intro">个人简介 <span class="req">*</span></label>
+                <textarea id="intro" name="intro" rows="4" required="" maxlength="200" placeholder="简单介绍下自己，为什么想加入（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full">
+                <label for="learned">已学内容 <span class="opt">选填</span></label>
+                <textarea id="learned" name="learned" rows="3" maxlength="200" placeholder="学过的语言 / 框架 / 做过的东西（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full">
+                <label for="ai_views">对 AI 发展的看法 <span class="opt">选填</span></label>
+                <textarea id="ai_views" name="ai_views" rows="3" maxlength="200" placeholder="随意聊聊，一两句也行（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full actions">
+                <button type="submit" class="submit" id="submit-btn" disabled="">报名未开放</button>
+                <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+              </div>
+
+              <!-- 编辑码掉落后的人工兜底入口 -->
+              <div class="field full" id="have-token-wrap" hidden="">
+                <label for="edit_token_input">已有编辑码？</label>
+                <div class="captcha-row">
+                  <input type="text" id="edit_token_input" maxlength="64" autocomplete="off" placeholder="粘贴首次提交时保存的编辑码">
+                  <button type="button" id="edit-start" class="link-btn">修改我的报名</button>
+                </div>
+              </div>
+
+              <p class="form-foot" id="form-foot">验证码看不清或无法完成？发送邮件至 lab@example.com 人工报名。</p>
+            <input type="text" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true" disabled="" style="position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></form>
+
+            <!-- 提交成功后一次性展示编辑码 -->
+            <div id="token-panel" class="token-panel" hidden="">
+              <h3>请立即保存你的编辑码</h3>
+              <p class="token-note">这是你之后修改报名信息的唯一凭证，<strong>我们不会再显示它</strong>。建议截图或复制到备忘录。</p>
+              <div class="token-box">
+                <code id="token-value"></code>
+                <button type="button" id="token-copy" class="link-btn">复制</button>
+              </div>
+              <p class="token-warn">请勿把编辑码发给他人。丢失编辑码需联系管理员人工核验身份。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 加群 + 友链 ============ -->
+    <section class="sec" id="join">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">GROUP</span>先加群，别错过通知</h2>
+
+        <div class="join-grid">
+          <div class="qr">
+            <img id="qr-img" alt="招新群二维码" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='1'%20height='1'/%3E" hidden="">
+            <p id="qr-fallback" class="hint">招新群二维码暂未配置。请稍后再来，或通过下方邮箱联系我们。</p>
+          </div>
+          <div class="join-info">
+            <p>群里只做通知：报名开放、面试安排、结果公布都会在这里同步。</p>
+            <p class="warn">二维码 7 天后会失效。<strong>建议转发本页链接，不要转发二维码截图</strong>——截图过期后同学就扫不进来了。</p>
+            <p id="join-contact" class="hint">群二维码失效或群已满？请联系 lab@example.com 拉你进群。</p>
+          </div>
+        </div>
+
+        <div class="links-block">
+          <h3 class="h3">友情链接</h3>
+          <div id="link-list" class="link-list reveal"><article class="link-card reveal" tabindex="0" role="button" aria-expanded="false"><div class="name"><span>第一个网站</span><span class="chev">→</span></div><div class="desc">这里是第一个网站的简介，点击卡片展开后可在新标签页打开。</div><a class="open-btn" href="https://example.com/1" target="_blank" rel="noopener noreferrer" id="link-08-在新标签页打开">在新标签页打开 ↗</a></article><article class="link-card reveal" tabindex="0" role="button" aria-expanded="false"><div class="name"><span>第二个网站</span><span class="chev">→</span></div><div class="desc">这里是第二个网站的简介，点击卡片展开后可在新标签页打开。</div><a class="open-btn" href="https://example.com/2" target="_blank" rel="noopener noreferrer" id="link-09-在新标签页打开">在新标签页打开 ↗</a></article></div>
+        </div>
+
+        <footer class="foot">© 2026 网络攻防与信息安全实验室</footer>
+      </div>
+    </section>
+
+  </main>
+  <div class="chrome">
+    <span class="chrome-file" id="sb-file">❯ AuthController.java · java</span>
+    <span class="chrome-sp"></span>
+    <span class="chrome-phase"><i class="chrome-dot" aria-hidden="true"></i><span class="top-status" id="phase-text">预热中</span></span>
+    <a class="chrome-link" id="sb-join" href="#join">加群</a>
+    <a class="chrome-link chrome-cta" id="sb-apply" href="#apply">报名</a>
+  </div>
+<script data-source="public/codefield-data.js">
+/* ============================================================
+   场域内容 —— 纯数据
+
+   这个文件里只有字符串，没有逻辑。改文案 / 换代码只改这里。
+
+   每个 document：
+     id       唯一键，也用作方向色
+     dir      中文方向名（和报名表 select 的值一致）
+     file     文件名
+     lang     分词器语言：java / c / python（terminal 档不分词）
+     mode     'editor'   带行号，逐字打字
+              'terminal' 终端，整块追加 + 流式文本 + 思考停顿
+     code     真的代码
+     install  进入这个文件之前跑的「拉取依赖」日志（各用各的生态）
+
+   ⚠ 硬约束：编辑器档每行 ≤ 40 宽度单位（中文算 2）。
+     手机上代码字号 11px 时可用宽约 344px，40 单位正好放得下；
+     超了就会被裁掉，看着像坏了。改完跑一遍自检命令（rev 里的新版本也算）。
+
+   rev  可选。键是「原样的一整行」，值是「改主意之后的版本」。
+        引擎打完这一行后有机会停下来、全选删掉、重打成新版本，
+        也就是「整行重写」。键用原文而不是行号，插入行时不会错位。
+
+   ⚠ 依赖日志必须用对应生态：Java=Maven、C=apt+make、Python=pip、AI=npx。
+     这块写错，内行一眼就看出是假的。
+   ============================================================ */
+
+window.CODEFIELD_DATA = {
+
+  /* ---------- 软件：Spring Boot / Java ---------- */
+  sw: {
+    id: 'sw', dir: '软件', file: 'AuthController.java', lang: 'java', mode: 'editor',
+    code: [
+      'package lab.recruit.auth;',
+      '',
+      'import org.springframework.http.*;',
+      'import org.springframework.web.bind.*;',
+      'import jakarta.validation.Valid;',
+      '',
+      '// 密码比对交给编码器，别自己写 ==',
+      '@RestController',
+      '@RequestMapping("/api/auth")',
+      'public class AuthController {',
+      '',
+      '    private final TokenService tokens;',
+      '    private final UserRepository users;',
+      '',
+      '    public AuthController(',
+      '        TokenService t,',
+      '        UserRepository u) {',
+      '        this.tokens = t;',
+      '        this.users = u;',
+      '    }',
+      '',
+      '    @PostMapping("/login")',
+      '    public ResponseEntity<Token> login(',
+      '        @Valid @RequestBody Form f) {',
+      '        return users',
+      '            .findByStudentId(f.id())',
+      '            .filter(u -> ok(u, f))',
+      '            .map(tokens::issue)',
+      '            .map(ResponseEntity::ok)',
+      '            .orElseGet(this::no);',
+      '    }',
+      '',
+      '    private boolean ok(User u, Form f) {',
+      '        if (u.locked()) {',
+      '            log.warn("locked");',
+      '            return false;',
+      '        }',
+      '        return encoder()',
+      '            .matches(f.pw(), u.hash());',
+      '    }',
+      '',
+      '    private ResponseEntity<Token> no() {',
+      '        return ResponseEntity',
+      '            .status(401)',
+      '            .build();',
+      '    }',
+      '}',
+    ].join('\n'),
+    /* 改主意：打完这些行之后，有机会全选删掉重打成另一个版本。
+       键必须是原文一字不差 —— 用行号的话插入一行就全错位了。
+       三个新版本都比原文短或等长（中文注释只从双宽变单宽）。 */
+    rev: {
+      '// 密码比对交给编码器，别自己写 ==': '// 别自己写 ==，用编码器',
+      '        if (u.locked()) {': '        if (u.locked() || u.dead) {',
+      '            log.warn("locked");': '            log.warn("locked out");',
+    },
+    install: [
+      '[INFO] Scanning for projects...',
+      '[INFO] Building recruit-auth 0.1.0-SNAPSHOT',
+      '[INFO] ----------------------------[ jar ]----',
+      '[INFO] Downloading spring-boot-starter-security-3.2.4.jar',
+      '[INFO] Downloaded  62 kB at 1.9 MB/s',
+      '[INFO] Downloading spring-security-core-6.2.3.jar',
+      '[INFO] Downloaded 596 kB at 8.4 MB/s',
+      '[INFO] Downloading spring-security-web-6.2.3.jar',
+      '[INFO] Downloaded 462 kB at 7.1 MB/s',
+      '[INFO] Downloading spring-security-config-6.2.3.jar',
+      '[INFO] Downloaded 288 kB at 5.9 MB/s',
+      '[INFO] Downloading jjwt-api-0.12.5.jar',
+      '[INFO] Downloaded 139 kB at 4.2 MB/s',
+      '[INFO] Downloading jjwt-impl-0.12.5.jar',
+      '[INFO] Downloaded 256 kB at 6.0 MB/s',
+      '[INFO] Downloading h2-2.2.224.jar',
+      '[INFO] Downloaded 2.5 MB at 12.8 MB/s',
+      '[INFO] Downloading jackson-databind-2.15.4.jar',
+      '[INFO] Downloaded 1.6 MB at 10.4 MB/s',
+      '[INFO] Downloading validation-api-3.0.2.jar',
+      '[INFO] Downloaded 125 kB at 4.8 MB/s',
+      '[INFO] --- compiler:3.11.0:compile (default) ---',
+      '[INFO] Compiling 24 source files with javac [release 17]',
+      '[INFO] Changes detected - recompiling the module!',
+      '[INFO] BUILD SUCCESS',
+      '[INFO] Total time:  11.482 s',
+    ],
+  },
+
+  /* ---------- 硬件：C ---------- */
+  hw: {
+    id: 'hw', dir: '硬件', file: 'fw_load.c', lang: 'c', mode: 'editor',
+    code: [
+      '#include <stdint.h>',
+      '#include <string.h>',
+      '#include "flash.h"',
+      '',
+      '/* 寄存器基址，手册 7.3 节 */',
+      '#define PERIPH_BASE 0x40000000u',
+      '#define FLASH_SR (PERIPH_BASE + 0x10u)',
+      '#define FLASH_CR (PERIPH_BASE + 0x14u)',
+      '#define R(o) (*(volatile uint32_t*)o)',
+      '',
+      '#define BSY (1u << 0)',
+      '#define PG  (1u << 3)',
+      '',
+      'static int wait_ready(uint32_t ticks)',
+      '{',
+      '    uint32_t t = 0;',
+      '',
+      '    while (R(FLASH_SR) & BSY) {',
+      '        if (++t > ticks) {',
+      '            return -ETIMEDOUT;',
+      '        }',
+      '        __NOP();',
+      '    }',
+      '    return 0;',
+      '}',
+      '',
+      '/* len 是外面传进来的，先夹住再搬 */',
+      'int fw_load(uint8_t *dst,',
+      '            const uint8_t *src,',
+      '            size_t len, size_t cap)',
+      '{',
+      '    if (dst == NULL || src == NULL) {',
+      '        return -EINVAL;',
+      '    }',
+      '    if (len == 0u || len > cap) {',
+      '        return -EINVAL;',
+      '    }',
+      '    if (len % 4u != 0u) {',
+      '        return -EINVAL;',
+      '    }',
+      '    if (wait_ready(1000u) != 0) {',
+      '        return -EBUSY;',
+      '    }',
+      '    R(FLASH_CR) |= PG;',
+      '    size_t i;',
+      '    for (i = 0; i < len; i += 4u) {',
+      '        memcpy(dst + i, src + i, 4u);',
+      '        if (wait_ready(50u) != 0) {',
+      '            R(FLASH_CR) &= ~PG;',
+      '            return -EBUSY;',
+      '        }',
+      '    }',
+      '    R(FLASH_CR) &= ~PG;',
+      '    return (int)len;',
+      '}',
+    ].join('\n'),
+    /* 改主意：% 4 换成位与，固件里这是常规写法（除法比位与贵得多）。 */
+    rev: {
+      '    if (len % 4u != 0u) {': '    if ((len & 3u) != 0u) {',
+      '    R(FLASH_CR) |= PG;': '    R(FLASH_CR) |= PG | EOPIE;',
+    },
+    install: [
+      'Hit:1 http://deb.debian.org/debian bookworm InRelease',
+      'Get:2 http://deb.debian.org/debian bookworm/main amd64 libusb-1.0-0-dev 2:1.0.26-1',
+      'Get:3 http://deb.debian.org/debian bookworm/main amd64 openocd 0.12.0-1',
+      'Get:4 http://deb.debian.org/debian bookworm/main amd64 gcc-arm-none-eabi 15:12.2.rel1-1',
+      'Get:5 http://deb.debian.org/debian bookworm/main amd64 libnewlib-dev 3.3.0-1',
+      'Get:6 http://deb.debian.org/debian bookworm/main amd64 libstdc++-arm-none-eabi-newlib 15:12.2.rel1-1',
+      'Fetched 61.4 MB in 4s (15.4 MB/s)',
+      'Selecting previously unselected package openocd.',
+      'Unpacking openocd (0.12.0-1) ...',
+      'Selecting previously unselected package gcc-arm-none-eabi.',
+      'Unpacking gcc-arm-none-eabi (15:12.2.rel1-1) ...',
+      'Setting up libusb-1.0-0-dev:amd64 (2:1.0.26-1) ...',
+      'Setting up openocd (0.12.0-1) ...',
+      'Setting up gcc-arm-none-eabi (15:12.2.rel1-1) ...',
+      'Processing triggers for man-db (2.11.2-2) ...',
+      '$ make -j4',
+      '  CC      src/startup.o',
+      '  CC      src/flash.o',
+      '  CC      src/usb.o',
+      '  CC      src/crc.o',
+      '  CC      src/main.o',
+      '  LD      build/firmware.elf',
+      '  OBJCOPY build/firmware.bin',
+      '  SIZE    build/firmware.elf',
+      '   text    data     bss     dec     hex filename',
+      '   9148     128    2112   11388    2c7c firmware.elf',
+    ],
+  },
+
+  /* ---------- 算法：Python ---------- */
+  al: {
+    id: 'al', dir: '算法', file: 'birthday.py', lang: 'python', mode: 'editor',
+    code: [
+      'from hashlib import sha256',
+      'from secrets import token_bytes',
+      '',
+      '',
+      '# 生日界：n 位摘要只需要',
+      '# 大约 2^(n/2) 次就会撞上。',
+      'def collision_bound(bits: int) -> int:',
+      '    return 1 << (bits // 2)',
+      '',
+      '',
+      'def digest(i: int, bits: int) -> bytes:',
+      '    raw = i.to_bytes(8, "big")',
+      '    full = sha256(raw).digest()',
+      '    return full[: bits // 8]',
+      '',
+      '',
+      'def find_collision(bits: int = 160,',
+      '                  limit: int = 1 << 26):',
+      '    """返回第一对碰撞，找不到返回空。"""',
+      '    seen: dict[bytes, int] = {}',
+      '    bound = min(limit, 2 ** (bits // 2))',
+      '    step = Counter(bound)',
+      '    for i in range(bound):',
+      '        d = digest(i, bits)',
+      '        if d in seen:',
+      '            return seen[d], i',
+      '        seen[d] = i',
+      '        if step.add():',
+      '            print("到", step.mark, "次")',
+      '    return None',
+      '',
+      '',
+      'class Counter:',
+      '    """按 2 的幂分段报进度。"""',
+      '',
+      '    def __init__(self, total: int):',
+      '        self.total = total',
+      '        self.seen = 0',
+      '        self.mark = 1',
+      '',
+      '    def add(self, n: int = 1) -> bool:',
+      '        self.seen += n',
+      '        if self.seen >= self.mark:',
+      '            self.mark *= 2',
+      '            return True',
+      '        return False',
+    ].join('\n'),
+    /* 改主意：// 2 和 ** 换成移位，密码学代码里读起来更贴近位运算的本质。 */
+    rev: {
+      '    return 1 << (bits // 2)': '    return 1 << (bits >> 1)',
+      '    bound = min(limit, 2 ** (bits // 2))': '    bound = min(limit, 1 << (bits >> 1))',
+    },
+    install: [
+      'Collecting numpy==1.26.4',
+      '  Downloading numpy-1.26.4-cp311-cp311-manylinux_2_17_x86_64.whl (18.2 MB)',
+      { bar: true, chars: 34, ms: 3200, label: '18.2/18.2 MB 42.1 MB/s' },
+      'Collecting pycryptodome==3.20.0',
+      '  Downloading pycryptodome-3.20.0-cp35-abi3-manylinux_2_17_x86_64.whl (2.1 MB)',
+      { bar: true, chars: 34, ms: 1500, label: '2.1/2.1 MB 28.6 MB/s' },
+      'Collecting sympy==1.12',
+      '  Downloading sympy-1.12-py3-none-any.whl (5.7 MB)',
+      { bar: true, chars: 34, ms: 2200, label: '5.7/5.7 MB 31.2 MB/s' },
+      'Collecting mpmath==1.3.0',
+      '  Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)',
+      { bar: true, chars: 34, ms: 900, label: '536/536 kB 19.4 MB/s' },
+      'Building wheels for collected packages: pycryptodome',
+      '  Building wheel for pycryptodome (setup.py) ... done',
+      '  Created wheel for pycryptodome',
+      'Installing collected packages: numpy, pycryptodome, sympy, mpmath',
+      '  Attempting uninstall: numpy',
+      '    Found existing installation: numpy 1.24.4',
+      '    Uninstalling numpy-1.24.4:',
+      '      Successfully uninstalled numpy-1.24.4',
+      'Successfully installed mpmath-1.3.0 numpy-1.26.4',
+      '                     pycryptodome-3.20.0 sympy-1.12',
+    ],
+  },
+
+  /* ---------- 人工智能：Claude Code 终端 ----------
+     这一档不「写代码」，是跟 coding harness 对话。
+     所以它换掉整个渲染面（终端、无行号），也换掉整套运动：
+       · 工具调用  整块出现
+       · 助手正文  流式（chunk 追加，像 token 流）
+       · 思考      长时间转圈 + 秒数递增 —— 停顿才是主角
+     ⚠ 屏幕上的引导句用的是半角标点，因为终端里没人打全角括号，
+       而且全角标点在等宽字体下会打断对齐。
+     ============================================ */
+  ai: {
+    id: 'ai', dir: '人工智能', file: 'claude', lang: 'terminal', mode: 'terminal',
+    install: [
+      'Need to install the following packages:',
+      '  @anthropic-ai/claude-code@2.1.261',
+      'Ok to proceed? (y) y',
+      'npm warn deprecated node-domexception@1.0.0',
+      'added 3 packages, and audited 4 packages in 6s',
+      '1 package is looking for funding',
+      '  run `npm fund` for details',
+      'found 0 vulnerabilities',
+      '$ claude',
+    ],
+    script: [
+      { k: 'box', lines: [
+        '╭──────────────────────────────────────────────────╮',
+        '│ ✻ Welcome to Claude Code                         │',
+        '│                                                  │',
+        '│   /help for help, /status for your current setup  │',
+        '│   cwd: /home/lab/recruit-server                  │',
+        '╰──────────────────────────────────────────────────╯',
+      ] },
+      { k: 'wait', ms: 700 },
+      { k: 'type', text: '> 看下 src/auth.ts 的登录逻辑，有没有注入风险？', speed: 62 },
+      { k: 'wait', ms: 420 },
+
+      { k: 'think', ms: 5200, label: 'Cogitating' },
+
+      { k: 'say', text: '⏺ Read(src/auth.ts)' },
+      { k: 'wait', ms: 640 },
+      { k: 'note', text: '  ⎿  Read 128 lines' },
+      { k: 'wait', ms: 460 },
+      { k: 'say', text: '⏺ Grep(pattern="SELECT|INSERT|UPDATE", path="src")' },
+      { k: 'wait', ms: 700 },
+      { k: 'note', text: '  ⎿  Found 7 matching lines in 3 files' },
+      { k: 'wait', ms: 820 },
+
+      { k: 'stream', text: '⏺ 找到 3 处字符串拼接。第 42 行最危险，role 直接来自查询参数：', per: 34 },
+      { k: 'wait', ms: 420 },
+      { k: 'code', text: '   41    const role = req.query.role' },
+      { k: 'code', text: '   42    const sql = `SELECT * FROM users WHERE role = \'${role}\'`' },
+      { k: 'code', text: '   43    return db.query(sql)' },
+      { k: 'wait', ms: 900 },
+      { k: 'stream', text: '⏺ 带 ? 进去，输入就只会被当成值。改成参数化查询：', per: 30 },
+      { k: 'wait', ms: 400 },
+
+      { k: 'think', ms: 6400, label: 'Thinking' },
+
+      { k: 'say', text: '⏺ Update(src/auth.ts)' },
+      { k: 'wait', ms: 620 },
+      { k: 'note', text: '  ⎿  Updated src/auth.ts with 2 additions and 1 removal' },
+      { k: 'del',  text: '   42 -  const sql = `SELECT * FROM users WHERE role = \'${role}\'`' },
+      { k: 'add',  text: '   42 +  const sql = \'SELECT * FROM users WHERE role = ?\'' },
+      { k: 'add',  text: '   43 +  return db.query(sql, [role])' },
+      { k: 'wait', ms: 780 },
+      { k: 'say', text: '⏺ 同样的写法还有 2 处，一起改了：' },
+      { k: 'note', text: '  ⎿  Updated src/search.ts with 1 addition and 1 removal' },
+      { k: 'note', text: '  ⎿  Updated src/report.ts with 1 addition and 1 removal' },
+      { k: 'wait', ms: 700 },
+      { k: 'say', text: '⏺ Bash(npm test)' },
+      { k: 'wait', ms: 900 },
+      { k: 'note', text: '  ⎿  Tests  24 passed (24)' },
+      { k: 'wait', ms: 640 },
+
+      { k: 'think', ms: 4200, label: 'Cogitating' },
+
+      { k: 'stream', text: '⏺ 3 处都改成参数化查询了，测试全过。注意 role 这类枚举值如果来自白名单，最好在入口再做一次校验。', per: 32 },
+      { k: 'wait', ms: 760 },
+      { k: 'type', text: '> 那 session 过期是怎么处理的？', speed: 66 },
+      { k: 'wait', ms: 400 },
+      { k: 'say', text: '⏺ Read(src/session.ts)' },
+      { k: 'wait', ms: 600 },
+      { k: 'note', text: '  ⎿  Read 96 lines' },
+      { k: 'wait', ms: 420 },
+
+      { k: 'think', ms: 7000, label: 'Pondering' },
+
+      { k: 'stream', text: '⏺ 用的是滑动过期：每次请求把 expiresAt 往后推 30 分钟，同时留了一个绝对上限 12 小时。', per: 30 },
+      { k: 'wait', ms: 520 },
+      { k: 'code', text: '   18    const renew = (s) => ({' },
+      { k: 'code', text: '   19      ...s,' },
+      { k: 'code', text: '   20      expiresAt: now() + SLIDE,' },
+      { k: 'code', text: '   21      hardStop: s.hardStop,' },
+      { k: 'code', text: '   22    })' },
+      { k: 'wait', ms: 700 },
+      { k: 'stream', text: '⏺ 一个隐患：hardStop 只在创建时写死，续期时没跟着走，所以 12 小时上限其实永远不会命中。', per: 30 },
+      { k: 'wait', ms: 640 },
+      { k: 'spin', text: '✻ Cogitating…' },
+    ],
+  },
+};
+
+window.CODEFIELD_ORDER = ['sw', 'hw', 'al', 'ai'];
+
+</script>
+<script data-source="public/codefield.js">
+/* ============================================================
+   代码场域引擎
+
+   一件事：把一个文档，用「像人一样」的节奏画到全屏图层上。
+
+   两种渲染面（这是四个方向不塌成同一种运动的关键）：
+     editor    三档：行号、逐字打字、缩进瞬现、打错删除重打
+     terminal  一档：无行号、工具调用整块出现、正文流式、思考时长时间停顿
+
+   三种互不相同的运动：
+     打字   一个字一个字，有连击节奏和停顿
+     流式   AI 正文按 chunk 追加（像 token 流）
+     追加   工具调用 / 日志整块跳出
+
+   为什么好看又便宜：
+     建 DOM 时一次性把整篇文档铺好，未打到的 token 只是 opacity:0。
+     版面从一开始就是最终形状 → 打字过程中零重排、零位移。
+     每次 tick 只改一个 span 的 textContent。
+   ============================================================ */
+(() => {
+  'use strict';
+
+  const DATA  = window.CODEFIELD_DATA;
+  const ORDER = window.CODEFIELD_ORDER;
+  if (!DATA || !ORDER) return;
+
+  /* 场域根节点。静态对照表那种页面没有它 —— 那时只导出渲染函数。
+     注意：不能因为缺 root 就 return，否则 window.codefield 根本不会存在，
+     而 HTML 的 id 会让它静默变成同名元素，调用方拿到一个没有方法的对象。 */
+  const root  = document.getElementById('cf-root');
+  const elBody = root && root.querySelector('.cf-body');
+  const elFile = root && root.querySelector('.cf-file');
+  const elLang = root && root.querySelector('.cf-lang');
+  // 徽标挂在 .cf 外面（原因见 HTML 注释），所以从 document 找
+  const elHold = document.querySelector('.cf-hold');
+  // ⚠ 也要从 document 找。徽标整个搬到 .cf 外面了，
+  //    这里如果还用 root.querySelector，elHoldText 会是 null，
+  //    徽标只会显示写死的「已暂停」，看不出是因为什么停的（实测踩到）。
+  const elHoldText = document.querySelector('.cf-hold-text');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  /* ============================================================
+     节奏参数 —— 全部集中在这里，想改手感只改这一块
+
+     之前的问题：速度是「固定的一格一格」，看着像机器。
+     现在用「连击」模型 —— 人手是敲一串、停一下、再敲一串：
+       连击 5–14 个字（13–21ms/字）  →  停一下（140–470ms，偏短的居多）
+     这个结构本身就让速度看起来不均匀，而不是靠加随机数。
+
+     停顿用偏斜分布：大多数短，偶尔长。均匀随机会显得假。
+     ============================================================ */
+  const PACE = {
+    burst:    [5, 15],      // 一串敲几个字
+    fast:     [16, 26],     // 连击时的击键间隔。下限卡在 16ms 左右：
+                            //   再快就是一帧一个字（60fps=16.7ms），看不出是「一个一个」在打
+    rest:     [140, 470],   // 串与串之间停顿（偏斜：短的多）
+    restP:    2.1,          // 偏斜指数，越大越偏短
+    dazeP:    0.035,        // 偶尔会「走神」一下 —— 概率很低，但少了就不像人
+    daze:     [900, 2600],
+    speedUp:  0.55,
+
+    punct:    [90, 260],    // 标点后
+    line:     [220, 640],   // 换行后
+
+    corr: {
+      // 每个字出错的概率。1/60 ≈ 1.7%，接近真人打字的出错率；
+      // 一个 1000 字的文件约错 17 次，每次含「停→删→重打」约 1.2s。
+      p:      1 / 60,
+      cool:   28,           // 错完至少隔这么多字才可能再错
+      wordP:  0.45,         // 45% 是多字错（整词打错），其余是单字
+      word:   [2, 5],       // 多字错的字符数
+      alarm:  [360, 900],   // 意识到打错 → 停这么久（这一拍是「人味」的关键）
+      del:    [40, 76],     // 退格速度
+      after:  [70, 200],    // 退完再打对之前的小停
+    },
+
+    installLine: [46, 190], // 日志行之间的间隔
+    installRest: [180, 640],// 一批日志推完后的停顿
+    installBatch:[2, 6],    // 一批连推几行
+
+    /* 整行重写 —— 和「打错一个字」是两回事：
+         打错是手滑，错的是一两个字符；
+         重写是改主意，错的是整行的写法，所以停得更久、删得干净。
+       只对 doc.rev 里标了新版本的行生效，一行最多一次。 */
+    rewrite: {
+      p:     0.62,          // 标了 rev 的行有多少比例真的重写
+      hold:  [700, 2100],   // 打完停这么久才决定改
+      sel:   [220, 420],    // 全选高亮停一拍
+      gap:   [420, 900],    // 删干净后想一下再开始打
+    },
+
+    holdDone: 3600,         // 全部打完之后的停留
+  };
+
+  const rand = (r) => r[0] + Math.random() * (r[1] - r[0]);
+  const skew = (r, p) => r[0] + Math.pow(Math.random(), p) * (r[1] - r[0]);
+  const randInt = (r) => r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1));
+
+  // 错字概率覆盖：给了数字就直接用它当「每字出错概率」，没给就用 PACE 里的默认值。
+  // 为什么不乘：之前写成「系数」是错的 —— 设成 1 得到的是 0.0105 而不是 1，
+  // 钩子就变成了一个不能把关机/拉满的摆设，回归测试也就没法写。
+  const corrP = () => {
+    const o = window.CODEFIELD_TYPO_P;
+    return typeof o === 'number' ? o : PACE.corr.p;
+  };
+
+  // 同类钩子：整行重写的概率。0 = 关掉，1 = 标了的行全重写。
+  const rewriteP = () => {
+    const o = window.CODEFIELD_REWRITE_P;
+    return typeof o === 'number' ? o : PACE.rewrite.p;
+  };
+
+  /* ================= 2. 分词 =================
+     目标不是语法分析，是「看起来像 VSCode」。
+     VSCode Dark+ 里声明关键字是蓝的、控制流是紫的 —— 照它的分法才像。
+     ============================================ */
+
+  const KW = {
+    java:   'class interface enum extends implements import package public private protected ' +
+            'static final abstract void int long double float boolean char byte short ' +
+            'this super new var record sealed permits yield true false null instanceof',
+    c:      'const volatile static extern inline register signed unsigned sizeof struct union ' +
+            'typedef enum void char int long short float double NULL true false __NOP',
+    python: 'def class import from as pass lambda global nonlocal yield async await with ' +
+            'True False None self',
+  };
+  const CT = {
+    java:   'if else for while do switch case default break continue return throw throws try catch finally synchronized assert',
+    c:      'if else for while do switch case default break continue return goto',
+    python: 'if elif else for while in is not and or return break continue try except finally raise del assert match case',
+  };
+  const TY = {
+    java:   'String Integer Long Double Float Boolean Object List Map Set Optional ResponseEntity Token ' +
+            'LoginRequest Form RequestBody Valid RestController RequestMapping PostMapping GetMapping ' +
+            'PathVariable Autowired Service Repository Entity Id GeneratedValue Override Exception ' +
+            'HttpStatus User TokenService UserRepository AuthController',
+    c:      'uint8_t uint16_t uint32_t uint64_t int8_t int16_t int32_t int64_t size_t ssize_t intptr_t uintptr_t bool FILE va_list',
+    python: 'int str bytes float bool list tuple set dict complex object type Counter',
+  };
+  const mk = (s) => new Set(s.split(/\s+/).filter(Boolean));
+  const KWset = {}, CTset = {}, TYset = {};
+  for (const l of ['java', 'c', 'python']) { KWset[l] = mk(KW[l]); CTset[l] = mk(CT[l]); TYset[l] = mk(TY[l]); }
+
+  function tokenize(code, lang) {
+    const kw = KWset[lang], ct = CTset[lang], ty = TYset[lang];
+    const isPy = lang === 'python';
+    const lines = [[]];
+    const out = (c, s) => { if (s) lines[lines.length - 1].push({ c, s }); };
+
+    let i = 0;
+    const N = code.length;
+    while (i < N) {
+      const rest = code.slice(i);
+      let m;
+
+      if (isPy && rest[0] === '#') { m = /^#[^\n]*/.exec(rest); out('cm', m[0]); i += m[0].length; continue; }
+      if (!isPy && rest.startsWith('//')) { m = /^\/\/[^\n]*/.exec(rest); out('cm', m[0]); i += m[0].length; continue; }
+      if (!isPy && rest.startsWith('/*')) { m = /^\/\*[\s\S]*?\*\//.exec(rest); out('cm', m[0]); i += m[0].length; continue; }
+
+      if (lang === 'c' && /^#[ \t]*(include|define|ifdef|ifndef|endif|pragma)\b/.test(rest)) {
+        m = /^#[ \t]*\w+/.exec(rest); out('pp', m[0]); i += m[0].length; continue;
+      }
+
+      const q0 = rest[0];
+      if (q0 === '"' || q0 === "'" || q0 === '`') {
+        m = new RegExp('^' + (q0 === '`' ? '`(?:\\\\.|[^`\\\\])*`'
+                                          : q0 + '(?:\\\\.|[^' + q0 + '\\\\])*' + q0)).exec(rest);
+        if (m) { out('st', m[0]); i += m[0].length; continue; }
+      }
+
+      if (lang === 'java' && q0 === '@') { m = /^@[A-Za-z_]\w*/.exec(rest); out('an', m[0]); i += m[0].length; continue; }
+
+      if (q0 >= '0' && q0 <= '9') {
+        m = /^(?:0[xX][0-9a-fA-F_]+|\d[\d_]*(?:\.\d+)?)[uUlLfFdD]*/.exec(rest);
+        out('nu', m[0]); i += m[0].length; continue;
+      }
+
+      if (/[A-Za-z_]/.test(q0)) {
+        m = /^[A-Za-z_]\w*/.exec(rest);
+        const w = m[0];
+        let cls = 'va';
+        if (ct.has(w)) cls = 'ct';
+        else if (kw.has(w)) cls = 'kw';
+        else if (ty.has(w)) cls = 'ty';
+        else if (/^[A-Z]/.test(w)) cls = 'ty';
+        else if (/^[ \t]*\(/.test(code.slice(i + w.length))) cls = 'fn';
+        out(cls, w); i += w.length; continue;
+      }
+
+      if (q0 === '\n') { i++; lines.push([]); continue; }
+
+      if (q0 === ' ' || q0 === '\t') { m = /^[ \t]+/.exec(rest); out('ws', m[0]); i += m[0].length; continue; }
+
+      // ⚠ 必须排除引号/#/@// ，否则 `("` 这种连续符号会把后面的引号一起吃掉，
+      //    导致整个文件的字符串高亮错位（实测踩过）。
+      m = /^[^\sA-Za-z_0-9"'`#\/@]+/.exec(rest);
+      if (!m) { out('op', rest[0]); i += 1; continue; }
+      out('op', m[0]); i += m[0].length;
+    }
+    return lines;
+  }
+
+  /* ================= 3. 运行时状态 ================= */
+
+  const S = {
+    id: null, mode: null,
+    autoplay: true,
+    step: 0, timer: null, spinner: null,
+    curTok: null, curLine: null,
+    reasons: new Set(),      // 'input' | 'manual' | 'hidden' | 'reduced'
+    pausedAt: 0, pausedTotal: 0,
+  };
+
+  const isPaused = () => S.reasons.size > 0;
+
+  /**
+   * 「动画时钟」—— 暂停期间不走。要显示秒数的地方都用它，
+   * 否则暂停 30 秒回来，思考行会直接跳到 30s。
+   */
+  function clock() {
+    const now = Date.now();
+    const live = isPaused() && S.pausedAt ? now - S.pausedAt : 0;
+    return now - S.pausedTotal - live;
+  }
+
+  /**
+   * 排一个延时。暂停时不取消它 —— 原地等，恢复后从原处接着跑。
+   *
+   * 为什么不让暂停去取消定时器：定时器承载的是「这个效果演到哪了」。
+   * 取消掉就只能重演，用户滚一下页背景就从头开始，看着就是坏的
+   *（之前就是这么错的：滚回顶部会重新拉一遍依赖）。
+   */
+  function later(ms, fn) {
+    const my = S.step;
+    S.timer = setTimeout(() => {
+      if (my !== S.step) return;
+      if (isPaused()) return later(220, fn);
+      fn();
+    }, ms);
+  }
+
+  function bump() {
+    clearTimeout(S.timer); S.timer = null;
+    if (S.spinner) { clearInterval(S.spinner); S.spinner = null; }
+    S.step++;
+  }
+
+  function resetShift() {
+    if (elBody) elBody.scrollTop = 0;
+  }
+
+  /* ---------- 暂停理由 ---------- */
+
+  const HOLD_TEXT = {
+    input:   '正在填写表单',
+    manual:  '手动暂停',
+    hidden:  '页面切到后台',
+    reduced: '系统开了「减少动效」',
+  };
+  const HOLD_ORDER = ['input', 'manual', 'hidden', 'reduced'];
+
+  function updateHold() {
+    if (!elHold) return;
+    const hit = HOLD_ORDER.find((r) => S.reasons.has(r));
+    if (hit) {
+      if (elHoldText) elHoldText.textContent = '已暂停 · ' + HOLD_TEXT[hit];
+      elHold.hidden = false;
+      root.setAttribute('data-hold', hit);
+    } else {
+      elHold.hidden = true;
+      root.removeAttribute('data-hold');
+    }
+  }
+
+  function setReason(r, on) {
+    const was = isPaused();
+    if (on) S.reasons.add(r); else S.reasons.delete(r);
+    const now = isPaused();
+    if (now === was) { updateHold(); return; }
+    if (now) S.pausedAt = Date.now();
+    else if (S.pausedAt) S.pausedTotal += Date.now() - S.pausedAt;
+    updateHold();
+  }
+
+  /* ================= 4. 编辑器档 ================= */
+
+  let T = null;
+
+  /** 把一行文本建成 DOM 并插进 lineEl。整行重写时也用它重建。 */
+  function fillLine(lineEl, text, lang) {
+    lineEl.textContent = '';
+    const refs = [];
+    for (const t of (tokenize(text, lang)[0] || [])) {
+      const span = document.createElement('span');
+      span.className = 'cf-t k-' + t.c + ' is-hid';
+      span.textContent = t.s;          // 文本先铺好 → 版面即最终形状
+      lineEl.appendChild(span);
+      refs.push({ el: span, s: t.s, c: t.c });
+    }
+    return refs;
+  }
+
+  function buildEditor(doc) {
+    elBody.className = 'cf-body is-editor';
+    elBody.textContent = '';
+    const flat = [];
+    for (const toks of tokenize(doc.code, doc.lang)) {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'cf-line';
+      const text = toks.map((t) => t.s).join('');
+      if (!text) { elBody.appendChild(lineEl); flat.push({ line: lineEl, toks: null, text: '', rev: null }); continue; }
+      const refs = [];
+      for (const t of toks) {
+        const span = document.createElement('span');
+        span.className = 'cf-t k-' + t.c + ' is-hid';
+        span.textContent = t.s;
+        lineEl.appendChild(span);
+        refs.push({ el: span, s: t.s, c: t.c });
+      }
+      elBody.appendChild(lineEl);
+      // rev 用「原文」做键，所以这里用拼回来的行文本去查
+      flat.push({ line: lineEl, toks: refs, text, rev: (doc.rev && doc.rev[text]) || null, revUsed: false });
+    }
+    return flat;
+  }
+
+  function setCursor(tokEl, lineEl) {
+    if (S.curTok !== tokEl) {
+      if (S.curTok) S.curTok.classList.remove('is-cur');
+      S.curTok = tokEl || null;
+      if (tokEl) { tokEl.classList.remove('is-hid'); tokEl.classList.add('is-cur'); }
+    }
+    if (lineEl && S.curLine !== lineEl) {
+      if (S.curLine) S.curLine.classList.remove('is-cur');
+      S.curLine = lineEl;
+      lineEl.classList.add('is-cur', 'is-started');
+      followCursor(lineEl);
+    }
+  }
+
+  /**
+   * 跟随光标。代码带只有一小块，所以内容必须自己往上走。
+   *
+   * 两个约束：
+   *   · 活动行保持在可滚动区的上部 — 底边要留给渐隐区（代码在那儿慢慢融进黑）
+   *   · 只在真的越界时才动 scrollTop —— 每行都写会让滚动看着在抽
+   */
+  function followCursor(lineEl) {
+    if (!lineEl || !elBody) return;
+    const H = elBody.clientHeight;
+    if (!H) return;
+    const top = lineEl.offsetTop - elBody.scrollTop;
+    const bottom = top + lineEl.offsetHeight;
+    const hi = H * 0.92;
+    if (bottom > hi) { elBody.scrollTop += Math.ceil(bottom - hi); return; }
+    const lo = H * 0.18;
+    if (top < lo && elBody.scrollTop > 0) elBody.scrollTop = Math.max(0, elBody.scrollTop - Math.ceil(lo - top));
+  }
+
+  /**
+   * 终端 / 日志的跟随：新行往下推，超出后往上滚。
+   *
+   * 之前这里靠 CSS 的 justify-content:flex-end 做底对齐，
+   * 后果是第一行出现在带子底部、然后往上长 —— 「从下往上」的观感。
+   * 现在是顶对齐 + 往下长，超了才滚，和真终端一致。
+   */
+  function followBottom() {
+    if (!elBody) return;
+    const H = elBody.clientHeight;
+    const last = elBody.lastElementChild;
+    if (!H || !last) return;
+    const want = last.offsetTop + last.offsetHeight - H * 0.92;
+    if (want > elBody.scrollTop) elBody.scrollTop = Math.ceil(want);
+  }
+
+  /** 连击节奏：敲一串 → 停一下 → 再敲一串 */
+  function keyDelay() {
+    if (T.burst > 0) {
+      T.burst--;
+      // 连击尾部略微加速，像一串敲顺了
+      const fast = Math.random() < PACE.speedUp;
+      return fast ? rand([PACE.fast[0], PACE.fast[0] + 5]) : rand(PACE.fast);
+    }
+    T.burst = randInt(PACE.burst);
+    // 偶尔走神 —— 停得比平时久，这是「像人」里最难靠随机数模拟的一拍
+    if (Math.random() < PACE.dazeP) return rand(PACE.daze);
+    return skew(PACE.rest, PACE.restP);
+  }
+
+  function editorTick() {
+    if (!T) return;
+    const L = T.flat[T.li];
+    if (!L) return finishEditor();
+    if (!L.toks) return editorNextLine();
+    if (T.ti >= L.toks.length) return editorNextLine();
+
+    const tk = L.toks[T.ti];
+    setCursor(tk.el, L.line);
+
+    // 行首缩进：编辑器自动缩进，人不会一个格一个格敲空格。这个细节最像真人。
+    if (T.ch === 0 && tk.c === 'ws') { tk.el.textContent = tk.s; return afterToken(L); }
+
+    // 打错 → 停 → 删 → 重打
+    if (T.ch > 0 && T.ch < tk.s.length && rollCorrection()) return doCorrection(L, tk);
+
+    T.ch++;
+    onChar(L, tk);
+  }
+
+  function onChar(L, tk) {
+    tk.el.textContent = tk.s.slice(0, T.ch);
+    if (T.ch >= tk.s.length) return afterToken(L);
+    later(keyDelay(), editorTick);
+  }
+
+  /** 一个 token 打完 —— 标点后要停顿，那是人换气的地方 */
+  function afterToken(L) {
+    const done = L.toks[T.ti].s;
+    T.ti++; T.ch = 0;
+    let d = keyDelay();
+    if (/[;:]$/.test(done)) d += rand(PACE.punct);
+    else if (/[{},]$/.test(done)) d += rand(PACE.punct) * 0.7;
+    if (T.ti >= L.toks.length) return later(d + rand(PACE.line), editorTick);
+    later(d, editorTick);
+  }
+
+  function editorNextLine() {
+    const L = T.flat[T.li];
+
+    /* 整行重写：这一行刚打完，而它标了「改主意」的新版本。
+       注意只能在「这行真的有字且已打完」时触发 —— 空行和入口调用不行。 */
+    if (L && L.toks && L.toks.length && L.rev && !L.revUsed && Math.random() < rewriteP()) {
+      L.revUsed = true;
+      return doRewrite(L);
+    }
+
+    T.li++; T.ti = 0; T.ch = 0; T.burst = 0;
+    if (T.li >= T.flat.length) return finishEditor();
+    const N = T.flat[T.li];
+    if (N && N.line) setCursor(null, N.line);
+    if (N && !N.toks) return later(rand(PACE.line) * 0.5, editorTick);
+    later(rand(PACE.line), editorTick);
+  }
+
+  /**
+   * 整行重写：打完一行 → 停一下 → 全选这一行 → 删掉 → 打成新版本。
+   *
+   * 为什么重写后的内容必须是**另一个版本**而不是同一行再打一遍：
+   * 同一行重打看超来像卡住/循环，而换成 `% 4u` → `& 3u` 这种真的改进，
+   * 观众能看出「他改主意了」。所以重写的内容来自 doc.rev。
+   */
+  function doRewrite(L) {
+    // 先把光标收掉：这一行的字马上要被全选，光标留在上面很怪
+    if (S.curTok) { S.curTok.classList.remove('is-cur'); S.curTok = null; }
+    later(rand(PACE.rewrite.hold), () => {
+      L.line.classList.add('is-selected');            // VSCode 选区蓝
+      later(rand(PACE.rewrite.sel), () => {
+        L.line.classList.remove('is-selected');
+        L.line.textContent = '';
+        later(rand(PACE.rewrite.gap), () => {
+          L.toks = fillLine(L.line, L.rev, T.lang);
+          L.text = L.rev;
+          L.rev = null;
+          T.ti = 0; T.ch = 0; T.burst = randInt(PACE.burst); T.cool = 0;
+          L.line.classList.add('is-started');
+          later(140, editorTick);
+        });
+      });
+    });
+  }
+
+  function finishEditor() {
+    if (S.curTok) { S.curTok.classList.remove('is-cur'); S.curTok = null; }
+    if (S.curLine) { S.curLine.classList.remove('is-cur'); S.curLine = null; }
+    later(PACE.holdDone, () => { if (S.autoplay) nextDoc(); });
+  }
+
+  /* ---------- 打错 → 删除 → 重打 ---------- */
+
+  function rollCorrection() {
+    if (T.cool > 0) { T.cool--; return false; }
+    if (Math.random() >= corrP()) return false;
+    T.cool = PACE.corr.cool;
+    return true;
+  }
+
+  /**
+   * 两种错法：
+   *   单字错  敲错一个字符   → 停 → 退一格 → 重打
+   *   整词错  敲错 2–5 个字符 → 停更久 → 逐字退掉 → 重打
+   * 错的字符会挂上 .is-typo（红色波浪下划线，和 VSCode 的错误提示同款），
+   * 所以「打错了」这件事在屏幕上是看得见的，不是悄悄改掉。
+   */
+  function doCorrection(L, tk) {
+    const before = tk.s.slice(0, T.ch);
+    const wordy = Math.random() < PACE.corr.wordP;
+    const n = wordy ? randInt(PACE.corr.word) : 1;
+    const alpha = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let wrong = '';
+    for (let k = 0; k < n; k++) wrong += alpha[(Math.random() * alpha.length) | 0];
+
+    tk.el.classList.add('is-typo');
+
+    // 1) 把错的字符敲进去
+    let i = 0;
+    (function typeWrong() {
+      i++;
+      tk.el.textContent = before + wrong.slice(0, i);
+      if (i < n) return later(rand(PACE.fast) + 6, typeWrong);
+      // 2) 意识到打错了 —— 这一拍是关键，太快就不像人
+      later(rand(PACE.corr.alarm), erase);
+    })();
+
+    // 3) 逐字退掉
+    function erase() {
+      let j = n;
+      (function cut() {
+        j--;
+        tk.el.textContent = before + wrong.slice(0, j);
+        if (j > 0) return later(rand(PACE.corr.del), cut);
+        tk.el.classList.remove('is-typo');
+        // 4) 退干净了，停一下再重打
+        later(rand(PACE.corr.after), () => {
+          T.burst = randInt(PACE.burst);
+          editorTick();
+        });
+      })();
+    }
+  }
+
+  function startEditor(doc) {
+    const flat = buildEditor(doc);
+    resetShift();
+    T = { flat, lang: doc.lang, li: 0, ti: 0, ch: 0, burst: randInt(PACE.burst), cool: 0 };
+    while (T.li < flat.length && !flat[T.li].toks) { flat[T.li].line.classList.add('is-started'); T.li++; }
+    if (T.li >= flat.length) return finishEditor();
+    later(240, editorTick);
+  }
+
+  /* ================= 5. 终端档 ================= */
+
+  function termClass(t) {
+    if (/^\$\s/.test(t)) return 't-cmd';
+    if (/^>\s?/.test(t)) return 't-user';
+    if (/^⏺/.test(t)) return 't-say';
+    if (/^\s*⎿/.test(t)) return 't-note';
+    if (/^\s*\d+\s*\+/.test(t)) return 't-add';
+    if (/^\s*\d+\s*[-−]\s/.test(t)) return 't-del';
+    if (/^\s*\d+\s{2,}\S/.test(t)) return 't-code';
+    if (/^[╭│╰]/.test(t)) return 't-box';
+    if (/^[✻✳✢✽]/.test(t)) return 't-think';
+    if (/^(Need|Ok to|added|found|npm|1 package|  run )/.test(t)) return 't-log';
+    if (/^(Hit|Get:|Fetched|Selecting|Unpacking|Setting|Processing)/.test(t)) return 't-log';
+    if (/^\[INFO\]/.test(t)) return 't-log';
+    if (/^(Collecting|  Downloading|Installing|Successfully|  Building|  Created|  Attempting|    Found|    Uninstalling|      Successfully|Building wheels)/.test(t)) return 't-log';
+    if (/^\s{2}(CC|LD|OBJCOPY|SIZE|text|\d)/.test(t)) return 't-build';
+    if (/^\$\s?make/.test(t)) return 't-cmd';
+    return 't-plain';
+  }
+
+  function pushLineTo(body, text, cls) {
+    const d = document.createElement('div');
+    d.className = 'cf-tline ' + (cls || termClass(text));
+    d.textContent = text;
+    if (body.childElementCount > 240) body.removeChild(body.firstElementChild);
+    body.appendChild(d);
+    // 只有现场才需要跟随滚动（静态渲染用的是普通文档流）
+    if (body === elBody) followBottom();
+    return d;
+  }
+  const pushLine = (text, cls) => pushLineTo(elBody, text, cls);
+
+  const SPIN = ['✻', '✳', '✢', '✽'];
+
+  /**
+   * 思考：长时间转圈 + 秒数递增。
+   * 这是终端档和编辑器档最大的区别 —— 编辑器档里「打字」是主角，
+   * 终端档里「等」才是主角。工具跑一会儿、模型想一会儿，都是真实的停顿。
+   */
+  function startThink(spec, done) {
+    const el = pushLine('', 't-think');
+    const label = spec.label || 'Thinking';
+    const t0 = clock();          // 动画时钟：暂停期间不走
+    let k = 0;
+    if (S.spinner) clearInterval(S.spinner);
+    const paint = () => {
+      const sec = Math.max(0, Math.round((clock() - t0) / 1000));
+      el.textContent = SPIN[k] + ' ' + label + '… (' + sec + 's · ↑ ' +
+                       (0.4 + sec * 0.31).toFixed(1) + 'k tokens · esc to interrupt)';
+    };
+    paint();
+    S.spinner = setInterval(() => { k = (k + 1) % SPIN.length; paint(); }, 130);
+    later(spec.ms || 6000, () => {
+      if (S.spinner) { clearInterval(S.spinner); S.spinner = null; }
+      paint();
+      done();
+    });
+  }
+
+  /** 流式：正文按 chunk 追加，像 token 一个个吐出来 */
+  function startStream(spec, done) {
+    const el = pushLine('', 't-say');
+    const text = spec.text;
+    const per = spec.per || 32;
+    let i = 0;
+    (function ch() {
+      i += 1 + (Math.random() < 0.34 ? 1 : 0);     // 1–2 个字符一块
+      el.textContent = text.slice(0, i);
+      if (i >= text.length) return later(180, done);
+      later(per + Math.random() * 46, ch);
+    })();
+  }
+
+  function startTerminal(doc) {
+    elBody.className = 'cf-body is-terminal';
+    elBody.textContent = '';
+    const scr = doc.script || [];
+    let i = 0;
+
+    function step() {
+      if (i >= scr.length) {
+        if (S.spinner) { clearInterval(S.spinner); S.spinner = null; }
+        return later(PACE.holdDone + 1400, () => { if (S.autoplay) nextDoc(); });
+      }
+      const s = scr[i++];
+      switch (s.k) {
+        case 'wait': return later(s.ms || 400, step);
+
+        case 'think':
+          return startThink(s, step);
+
+        case 'stream':
+          return startStream(s, step);
+
+        case 'type': {                     // 提示符后是人打的 → 逐字
+          // 用 termClass 分类，不能写死 t-user：`$ claude` 是命令，`> …` 才是提问
+          const el = pushLine('', termClass(s.text));
+          let n = 0;
+          const per = s.speed || 60;
+          (function ch() {
+            el.textContent = s.text.slice(0, ++n);
+            if (n >= s.text.length) return later(150, step);
+            later(per + Math.random() * 52, ch);
+          })();
+          return;
+        }
+
+        case 'box': for (const l of s.lines) pushLine(l, 't-box'); return later(90, step);
+        case 'say':  pushLine(s.text, 't-say');  return later(250, step);
+        case 'note': pushLine(s.text, 't-note'); return later(230, step);
+        case 'code': pushLine(s.text, 't-code'); return later(270, step);
+        case 'del':  pushLine(s.text, 't-del');  return later(310, step);
+        case 'add':  pushLine(s.text, 't-add');  return later(310, step);
+
+        case 'spin': {
+          const el = pushLine(s.text + ' ', 't-think');
+          const tail = s.text.replace(/^[✻✳✢✽]\s*/, '');
+          let k = 0;
+          if (S.spinner) clearInterval(S.spinner);
+          S.spinner = setInterval(() => { k = (k + 1) % SPIN.length; el.textContent = SPIN[k] + ' ' + tail + '… (esc to interrupt)'; }, 130);
+          return later(150, step);
+        }
+        default: return later(200, step);
+      }
+    }
+    later(280, step);
+  }
+
+  /* ================= 6. 过渡：拉取依赖（各用各的生态） ================= */
+
+  /** 进度条。固定总宽，所以右边的标签不会随着填充左右跳动。 */
+  function fillBar(spec, done) {
+    const total = spec.chars || 34;
+    const el = document.createElement('div');
+    el.className = 'cf-tline t-bar';
+    const on = document.createElement('span'); on.className = 'bar-on';
+    const off = document.createElement('span'); off.className = 'bar-off';
+    const lab = document.createElement('span'); lab.className = 'bar-lab';
+    lab.textContent = ' ' + (spec.label || '');
+    el.appendChild(on); el.appendChild(off); el.appendChild(lab);
+    if (elBody.childElementCount > 240) elBody.removeChild(elBody.firstElementChild);
+    elBody.appendChild(el);
+    off.textContent = '━'.repeat(total);
+    followBottom();
+
+    let i = 0;
+    const per = (spec.ms || 2400) / total;
+    (function grow() {
+      i++;
+      on.textContent = '━'.repeat(i);
+      off.textContent = '━'.repeat(total - i);
+      followBottom();          // fillBar 只用于现场，静态版是 staticInstall
+      if (i < total) return later(per + Math.random() * 26, grow);
+      later(150, done);
+    })();
+  }
+
+  function makeInstallLine(item) {
+    const text = typeof item === 'string' ? item : (item.t || '');
+    return pushLine(text, termClass(text));
+  }
+
+  /**
+   * 日志是一阵一阵滚的：连推几行 → 停一下 → 再推。
+   * 均匀地一行一行等间隔输出，是「固定速度」观感的主要来源。
+   */
+  function startInstall(lines, done) {
+    elBody.className = 'cf-body is-install';
+    elBody.textContent = '';
+    let i = 0, run = 0, runLen = randInt(PACE.installBatch);
+    (function push() {
+      if (i >= lines.length) return later(300, done);
+      const item = lines[i++];
+      if (item && typeof item === 'object' && item.bar) return fillBar(item, () => later(80, push));
+
+      makeInstallLine(item);
+      if (++run >= runLen) {
+        run = 0; runLen = randInt(PACE.installBatch);
+        return later(skew(PACE.installRest, 1.6), push);
+      }
+      later(rand(PACE.installLine), push);
+    })();
+  }
+
+  /* ================= 7. 换档编排 ================= */
+
+  /* 真实开发是：关掉这个项目 → 装依赖 → 打开新文件。
+     所以顺序是 [选中全部并删除] → [拉取依赖] → [新文件打字 / 终端开始]。 */
+  function switchTo(id) {
+    const doc = DATA[id];
+    if (!doc) return;
+    bump();
+    S.id = id;
+    S.mode = doc.mode;
+    root.dataset.dir = doc.dir;
+    root.dataset.mode = doc.mode;
+    if (elFile) elFile.textContent = doc.file;
+    if (elLang) elLang.textContent = doc.lang === 'terminal' ? 'bash' : doc.lang;
+
+    const enter = () => {
+      if (reduce.matches) return staticRender(doc);
+      if (doc.mode === 'terminal') startTerminal(doc);
+      else startEditor(doc);
+    };
+
+    const hadCode = elBody.classList.contains('is-editor') && elBody.childElementCount > 0;
+
+    // 终端没法「全选删除」，直接清屏
+    if (!hadCode || doc.mode === 'terminal') {
+      elBody.textContent = '';
+      elBody.className = 'cf-body';
+      if (doc.install && !reduce.matches) return startInstall(doc.install, enter);
+      return enter();
+    }
+
+    // 全选（VSCode 选区蓝）→ 停一拍 → 删除
+    elBody.querySelectorAll('.cf-t').forEach((s) => s.classList.remove('is-hid'));
+    elBody.classList.add('is-selecting');
+    later(200, () => {
+      elBody.classList.remove('is-selecting');
+      elBody.textContent = '';
+      elBody.className = 'cf-body';
+      if (reduce.matches) return enter();
+      startInstall(doc.install || [], enter);
+    });
+  }
+
+  /* ================= 8. 静态渲染（对照表 / 减少动效） ================= */
+
+  function paintStatic(body, doc) {
+    if (doc.mode === 'terminal') {
+      body.className = 'cf-body is-terminal';
+      body.textContent = '';
+      for (const s of doc.script || []) {
+        if (s.k === 'box') { for (const l of s.lines) pushLineTo(body, l, 't-box'); }
+        else if (s.k === 'wait') continue;
+        else if (s.k === 'think') pushLineTo(body, '✻ ' + (s.label || 'Thinking') + '… (12s · esc to interrupt)', 't-think');
+        else if (s.k === 'spin') pushLineTo(body, (s.text || '✻') + ' … (esc to interrupt)', 't-think');
+        else if (s.k === 'type') pushLineTo(body, s.text, termClass(s.text));
+        else if (s.text) pushLineTo(body, s.text, termClass(s.text));
+      }
+      return;
+    }
+    body.className = 'cf-body is-editor';
+    body.textContent = '';
+    for (const toks of tokenize(doc.code, doc.lang)) {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'cf-line is-started';
+      for (const t of toks) {
+        const span = document.createElement('span');
+        span.className = 'cf-t k-' + t.c;
+        span.textContent = t.s;
+        lineEl.appendChild(span);
+      }
+      body.appendChild(lineEl);
+    }
+  }
+
+  function staticInstall(body, lines) {
+    body.className = 'cf-body is-install';
+    body.textContent = '';
+    for (const item of lines) {
+      if (item && typeof item === 'object' && item.bar) {
+        const el = document.createElement('div');
+        el.className = 'cf-tline t-bar';
+        const on = document.createElement('span'); on.className = 'bar-on';
+        on.textContent = '━'.repeat(item.chars || 34);
+        const lab = document.createElement('span'); lab.className = 'bar-lab';
+        lab.textContent = ' ' + (item.label || '');
+        el.appendChild(on); el.appendChild(lab);
+        body.appendChild(el);
+      } else {
+        pushLineTo(body, typeof item === 'string' ? item : (item.t || ''), null);
+      }
+    }
+  }
+
+  function staticRender(doc) {
+    if (S.curTok) { S.curTok.classList.remove('is-cur'); S.curTok = null; }
+    S.curLine = null;
+    resetShift();
+    paintStatic(elBody, doc);
+  }
+
+  function nextDoc() {
+    const k = ORDER.indexOf(S.id);
+    switchTo(ORDER[(k + 1) % ORDER.length]);
+  }
+
+  /* ================= 9. 什么时候停 =================
+
+     只有两个理由，都跟「用户在做别的事」有关 —— **和滚动位置无关**：
+       1. 用户正在填表（焦点在表单控件里）
+       2. 代码带不在视野内
+     加上页面切后台、系统减少动效。
+
+     都不取消定时器（见 later 的注释），所以回来看的时候是从原处接着演，
+     不会重头拉一遍依赖。之前「滚到顶部会重头开始」就是这个原因。
+     ================================================ */
+
+  /* 注意：这里**没有**「代码带离开视野就暂停」这条规则了。
+     带子是 position: fixed 钉在页面上侧的，永远不会离开视野 ——
+     留一条永远不触发的规则只是死代码，而且会让人以为它还在起作用。
+     现在停下来的理由只有「用户在做别的事」，与滚动位置无关。 */
+
+  document.addEventListener('visibilitychange', () => {
+    setReason('hidden', document.hidden);
+  });
+
+  /* 输入暂停：焦点进表单就停。
+     恢复延迟 800ms 是为了处理「Tab 到下一个字段」—— 中间会瞬间没焦点，
+     不延迟的话每跳一个字段就恢复一次，背景会一顿一顿地抖。 */
+  const FIELD = 'input, select, textarea, [contenteditable="true"]';
+  let blurTimer = null;
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (!t || !t.closest || !t.closest(FIELD)) return;
+    clearTimeout(blurTimer);
+    setReason('input', true);
+  });
+  document.addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (!t || !t.closest || !t.closest(FIELD)) return;
+    clearTimeout(blurTimer);
+    blurTimer = setTimeout(() => setReason('input', false), 800);
+  });
+
+  if (reduce.addEventListener) {
+    reduce.addEventListener('change', () => {
+      if (!S.id) return;
+      if (reduce.matches) { setReason('reduced', true); bump(); staticRender(DATA[S.id]); }
+      else { setReason('reduced', false); switchTo(S.id); }
+    });
+  }
+
+  /* ================= 10. 对外接口 ================= */
+
+  // 渲染类接口：任何页面都能用（静态对照表靠这几个）
+  const API = { order: ORDER.slice(), data: DATA, tokenize, termClass, paintStatic, staticInstall,
+                pace: PACE };
+
+  // 没有现场（静态页）：到此为止。动画接口不存在，但渲染接口可用。
+  if (!root) { window.codefield = API; return; }
+
+  Object.assign(API, {
+    go: switchTo,
+    next: nextDoc,
+    // 手动暂停 = 关掉自动轮播 + 冻住当前这一帧。恢复时从原处接着来。
+    pause() { S.autoplay = false; setReason('manual', true); },
+    resume() { S.autoplay = true; setReason('manual', false); },
+    // freeze 是给测试/对照表用的：取消所有挂起的定时器，直接铺终态。
+    freeze() { bump(); if (S.id) staticRender(DATA[S.id]); },
+    staticInstallFor(id) { staticInstall(elBody, (DATA[id] || {}).install || []); },
+    setReason,
+  });
+  /* ⚠ 这三个必须用 defineProperty，不能写进上面的 Object.assign：
+     Object.assign 取的是 getter 的**当前值**，不是 getter 本身。
+     写成 assign 的后果是 API.paused 永远是初始化那一刻的 false，
+     而徽标又是读 S.reasons 画的 —— 于是界面说「已暂停」、API 说「没暂停」。
+     这是实测抓到的 bug，不是假想的。 */
+  Object.defineProperty(API, 'current', { get() { return S.id; } });
+  Object.defineProperty(API, 'paused', { get() { return isPaused(); } });
+  Object.defineProperty(API, 'reasons', { get() { return [...S.reasons]; } });
+  Object.defineProperty(API, 'clock', { get() { return clock(); } });
+  window.codefield = API;
+
+  if (reduce.matches) {
+    S.reasons.add('reduced');
+    S.id = ORDER[0];
+    root.dataset.dir = DATA[ORDER[0]].dir;
+    root.dataset.mode = DATA[ORDER[0]].mode;
+    staticRender(DATA[ORDER[0]]);
+    updateHold();
+  } else {
+    switchTo(ORDER[0]);
+  }
+})();
+
+</script>
+<script data-source="draft-interaction">
+
+(() => {
+  const rows = [...document.querySelectorAll('.dir-row')];
+  const sbFile = document.getElementById('sb-file');
+  const D = window.CODEFIELD_DATA || {};
+  const label = (id) => { const d = D[id]; if (!d) return null;
+    return '❯ ' + d.file + ' · ' + (d.lang === 'terminal' ? 'bash' : d.lang); };
+  const sync = (id) => { const t = label(id); if (sbFile && t) sbFile.textContent = t;
+    rows.forEach((r) => r.setAttribute('aria-pressed', String(r.dataset.dir === id))); };
+  const go = (row, pause) => {
+    const cf = window.codefield;
+    if (!cf || !cf.go || !row.dataset.dir) return;
+    if (pause) cf.pause();
+    cf.go(row.dataset.dir); sync(row.dataset.dir);
+  };
+  rows.forEach((row) => {
+    row.addEventListener('mouseenter', () => go(row, false));
+    row.addEventListener('focus', () => go(row, false));
+    row.addEventListener('click', () => go(row, true));
+  });
+  // 友链卡片的展开是真实行为，静态稿补上，好让评审能看到展开态
+  document.querySelectorAll('.link-card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.open-btn')) return;
+      card.setAttribute('aria-expanded', card.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
+    });
+  });
+  setTimeout(() => { const cf = window.codefield; if (cf) sync(cf.current); }, 80);
+})();
+
+</script>
+</div>
+</body>
+</html>

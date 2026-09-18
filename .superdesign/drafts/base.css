@@ -1,0 +1,136 @@
+/* ============================================================
+   base.css —— 三个方向的**共同机制**，不含任何风格主张
+
+   放这里的只有三类东西：
+     1. 机制（盒模型、表单排布、可点尺寸、焦点环、打印、减动效）
+     2. 代码场域的几何（三个方向都必须保留这个活体背景）
+     3. 代码场域与内容层的层序契约
+
+   任何「看起来是什么样」的决定都不在这里 —— 那些属于各方向自己的层。
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--sd-sans);
+  font-size: 16px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body > div { position: relative; min-height: 100vh; }
+
+h1, h2, h3 { margin: 0; line-height: 1.22; }
+p { margin: 0; }
+ol, ul { margin: 0; padding: 0; }
+img { max-width: 100%; height: auto; }
+
+a { color: inherit; text-decoration: none; }
+
+/* 焦点环：三个方向都必须有，颜色各自定 */
+:focus-visible {
+  outline: 2px solid var(--sd-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 锚点跳转要避开各自的顶栏/吸顶元素 */
+section[id] { scroll-margin-top: var(--sd-anchor-gap, 72px); }
+
+/* 静态稿没有 app.js：隐藏态要自己保证 */
+[hidden] { display: none !important; }
+/* 也没有 reveal 的观察器：初始态必须是可见的 */
+.reveal { opacity: 1 !important; transform: none !important; }
+
+/* ---------- 可点元素 ≥44px（无障碍硬线，三个方向都不许破） ---------- */
+.btn, .submit, .link-btn, .open-btn, .top-cta, .tab, .nav a,
+.dir-row, .link-card, .chrome a, .rail-i { min-height: 44px; }
+
+/* ---------- 表单机制（样式各自定，排布与尺寸下限在这里） ---------- */
+#app-form { display: grid; gap: 16px; }
+.field { display: grid; gap: 7px; }
+.field.full { grid-column: 1 / -1; }
+.captcha-row { display: grid; gap: 10px; align-items: center; }
+.captcha-img { width: 150px; height: 50px; }
+label { font-size: 14.5px; }
+
+/* 17px：低于 16px 时 iOS 聚焦会缩放整页 —— 这是产品级硬约束，不是偏好 */
+input[type="text"], select, textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 17px;
+  line-height: 1.5;
+}
+textarea { min-height: 92px; resize: vertical; }
+input:disabled, select:disabled, textarea:disabled { opacity: .55; }
+
+@media (min-width: 640px) {
+  .captcha-row { grid-template-columns: 150px 1fr auto; }
+  .join-grid { display: grid; grid-template-columns: 192px 1fr; gap: 18px; align-items: start; }
+}
+.join-grid { display: grid; gap: 18px; }
+.join-info { display: grid; gap: 12px; }
+
+/* ============================================================
+   代码场域：三个方向共用同一套几何与层序
+   （层序：.cf z1 → 内容 z2 → 吸顶/底栏 z4。
+     .cf 内有 transform + contain，fixed 子元素会被困住，
+     所以暂停徽标与固定栏必须挂在 .cf 外面。）
+   ============================================================ */
+
+.cf { height: 100vh; height: 100dvh; }
+.cf .cf-body { top: var(--sd-field-top); bottom: var(--sd-field-bottom, 8%); left: 0; right: 0; width: 100%; }
+
+/* 行号栏与代码之间的竖发丝线 —— 编辑器最省力的签名 */
+.cf-body.is-editor::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(var(--cf-gut) - 8px);
+  width: 1px;
+  background: var(--sd-gutter-line, rgba(255, 255, 255, .08));
+  pointer-events: none;
+}
+
+.cf-meta { top: var(--sd-field-top); }
+.cf-hold {
+  top: calc(var(--sd-field-top) + 8px);
+  right: 12px;
+  font-family: var(--sd-mono);
+  font-size: 11px;
+  border-radius: 2px;
+}
+@media (max-width: 899px) {
+  .cf-body.is-editor::before { left: calc(30px - 6px); }
+}
+
+/* ============================================================
+   固定栏（chrome）与轨道（rail）：只有骨架位置，样式各自定
+   ============================================================ */
+
+.chrome { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; align-items: stretch; }
+.chrome-file, .chrome-phase { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-width: 0; }
+.chrome-file { overflow: hidden; text-overflow: ellipsis; }
+.chrome-sp { flex: 1 1 auto; min-width: 0; }
+
+.rail { position: fixed; z-index: 4; }
+.rail-i { display: flex; align-items: center; }
+
+/* ============================================================
+   降级
+   ============================================================ */
+
+@media print {
+  .cf, .cf-hold, .chrome, .rail, .top { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

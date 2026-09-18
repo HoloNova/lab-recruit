@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="editor-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码场域 · 四档静态对照表</title>
+  <!-- 四档一次性摊开，方便一眼比对。
+       用的是引擎里同一个 paintStatic()，所以这里看到的 = 动画跑完时的样子。 -->
+  <link rel="stylesheet" href="/api/themes.css">
+  <link rel="stylesheet" href="/codefield.css">
+  <link rel="stylesheet" href="/preview/codefield-sheet.css">
+</head>
+<body>
+
+  <header class="sheet-head">
+    <h1>四档静态对照表</h1>
+    <p>三档是<strong>编辑器</strong>（有行号、逐字打字），一档是<strong>终端</strong>（无行号、整块追加）。<br>
+       语法色全部取 VSCode 原生值，压在底色上均 ≥4.5:1，没有为了对比度调过色。</p>
+    <div class="theme-switch" role="group" aria-label="切换主题">
+      <button type="button" data-theme-set="editor-dark" aria-pressed="true">VSCode Dark Modern</button>
+      <button type="button" data-theme-set="editor-light" aria-pressed="false">VSCode Light+</button>
+    </div>
+  </header>
+
+  <main id="sheet" class="sheet"></main>
+
+  <script src="/codefield-data.js"></script>
+  <script src="/codefield.js"></script>
+  <script src="/preview/codefield-sheet.js"></script>
+</body>
+</html>

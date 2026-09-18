@@ -22,3 +22,6 @@ scout/
 # 测试与临时输出
 coverage/
 *.log
+
+# Superdesign 临时导入文件（自绘草稿的中间产物）
+.superdesign/tmp/

@@ -1,125 +1,137 @@
 /* ============================================================
-   实验室招新 —— 前端逻辑
-   1. 雾状粒子背景  2. 滚动显现  3. 方向联动
-   4. 阶段状态 / 公告 / 加群  5. 报名表（验证码 + 编辑码）
-   6. 友情链接
+   网络攻防与信息安全 · 实验室招新 —— 前端逻辑
+
+   1. 入场与顶部（进度线 / 当前区块 / 阶段）
+   2. 方向 → 预填报名表
+   3. 报名表（验证码 + 编辑码 + 完成度读数）
+   4. 公告 / 加群 / 友链
+
+   动效原则：零常驻 rAF。滚动只写一个元素的 transform，
+   且仅在变化 ≥0.5% 时写；不读布局、不交错读写。
    ============================================================ */
 
-/* ========== 1. 背景：雾状粒子场 ==========
-   目标：全屏可见的“雾感”。粒子大小不一、缓缓飘动、亮度呼吸，
-   偶尔微弱连线形成云气般的层次。不做密集线框，避免“乱竖线”。
-   粒子带一点整体方向漂移，像雾气在流动。 */
+/* JS 可用时才启用「先隐藏再入场」——
+   否则脚本失败会让标题永久隐形。CSS 里所有初始隐藏态都挂在 .js 下。 */
+document.documentElement.classList.add('js');
+
+/* ========== 1. 入场与顶部 ========== */
 (() => {
-  const canvas = document.getElementById('bg');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let w, h, dpr, parts = [], raf = null, t0 = 0;
-  const N = 150;
-  const dprMax = Math.min(window.devicePixelRatio || 1, 2);
+  const noIO = typeof IntersectionObserver !== 'function';
+  const all = (sel) => [...document.querySelectorAll(sel)];
 
-  function resize() {
-    dpr = dprMax;
-    w = canvas.width = window.innerWidth * dpr;
-    h = canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-  }
+  if (noIO) {
+    // 没有 IntersectionObserver 时直接呈现终态，绝不能让内容隐形
+    all('.reveal, .hero, .sec').forEach((el) => el.classList.add('visible'));
+  } else {
+    /* ---- 入场：列表项错峰淡入 ---- */
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+      }
+    }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' });
 
-  function makeParticle() {
-    const big = Math.random() < 0.35;
-    return {
-      x: Math.random() * w,
-      y: Math.random() * h,
-      r: big ? (30 + Math.random() * 90) * dpr : (1 + Math.random() * 2.6) * dpr,
-      big,
-      vx: (Math.random() - 0.5) * 0.1 * dpr + (Math.random() < 0.5 ? -0.02 : 0.02) * dpr,
-      vy: (Math.random() - 0.5) * 0.06 * dpr,
-      tw: Math.random() * Math.PI * 2,
-      twSpd: 0.004 + Math.random() * 0.01,
-      hueShift: Math.random() < 0.5 ? 1 : -1,
-    };
-  }
-  function seed() { parts = Array.from({ length: N }, makeParticle); }
-
-  function drawFog() {
-    ctx.clearRect(0, 0, w, h);
-    for (const p of parts) {
-      if (!p.big) continue;
-      p.x += p.vx * p.hueShift;
-      p.y += p.vy;
-      if (p.x < -p.r * 2) p.x = w + p.r;
-      if (p.x > w + p.r * 2) p.x = -p.r;
-      if (p.y < -p.r) p.y = h + p.r;
-      if (p.y > h + p.r) p.y = -p.r;
-      p.tw += p.twSpd;
-      const a = 0.05 + (Math.sin(p.tw) * 0.5 + 0.5) * 0.05;
-      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-      g.addColorStop(0, `rgba(244,244,244,${a})`);
-      g.addColorStop(1, 'rgba(244,244,244,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    for (const p of parts) {
-      if (p.big) continue;
-      p.x += p.vx * p.hueShift;
-      p.y += p.vy;
-      if (p.x < -10) p.x = w + 10;
-      if (p.x > w + 10) p.x = -10;
-      if (p.y < -10) p.y = h + 10;
-      if (p.y > h + 10) p.y = -10;
-      p.tw += p.twSpd * 2;
-      const a = 0.25 + Math.sin(p.tw) * 0.2;
-      ctx.fillStyle = `rgba(244,244,244,${Math.max(0.04, a)})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function step() {
-    drawFog();
-    raf = requestAnimationFrame(step);
-  }
-
-  window.addEventListener('resize', () => { resize(); seed(); });
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    resize(); seed();
-    raf = requestAnimationFrame(step);
-  }
-})();
-
-/* ========== 2. 滚动显现 ========== */
-(() => {
-  const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
-    }
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
-  window.__revealIO = io;
-})();
-
-/* ========== 3. 方向联动 → 预填报名表 ========== */
-(() => {
-  const dirSelect = document.getElementById('direction');
-  const applySec = document.getElementById('apply');
-  document.querySelectorAll('.dir-row').forEach((row) => {
-    row.addEventListener('click', () => {
-      const dir = row.dataset.direction;
-      if (!dir || !dirSelect) return;
-      dirSelect.value = dir;
-      applySec.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => {
-        const el = document.getElementById('student_id');
-        if (el) el.focus();
-      }, 700);
+    // 同一父容器内的 .reveal 依次错峰
+    all('.dir-list, .tl, .notice-list').forEach((box) => {
+      [...box.querySelectorAll('.reveal')].forEach((el, i) => el.style.setProperty('--i', i));
     });
-  });
+
+    all('.reveal').forEach((el) => io.observe(el));
+
+    /* ---- 标题擦入：由「所在区块」驱动，不观察标题自己 ----
+       标题初始带着 clip-path: inset(0 100% 0 0)，而 Chromium 的
+       IntersectionObserver 会把被 clip-path 裁掉的面积算成 0 交集
+       （实测：inset(0 50% 0 0) → intersectionRatio 恰好 0.5）。
+       所以观察标题自身会得到 ratio 恒为 0、永不触发的死锁。
+       改为观察未被裁剪的 .hero / .sec。 */
+    const secReveal = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) { e.target.classList.add('visible'); secReveal.unobserve(e.target); }
+      }
+    }, { threshold: 0, rootMargin: '0px 0px -15% 0px' });
+
+    all('.hero, .sec').forEach((el) => secReveal.observe(el));
+    window.__revealIO = io;
+  }
+
+  /* ---- 顶部：进度线 / 当前区块 / 导航高亮 ---- */
+  const fill = document.getElementById('prog-fill');
+  const navLinks = [...document.querySelectorAll('.nav a')];
+
+  const sections = navLinks
+    .map((a) => document.querySelector(a.getAttribute('href')))
+    .filter(Boolean);
+
+  // 当前区块 → 高亮对应导航项
+  const secIO = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      navLinks.forEach((a) => {
+        const on = a.getAttribute('href') === '#' + e.target.id;
+        if (on) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    }
+  }, { rootMargin: '-45% 0px -45% 0px' });
+
+  sections.forEach((s) => secIO.observe(s));
+
+  /* ---- 进度线：一个 transform，阈值 0.5% ---- */
+  if (fill) {
+    let last = -1, queued = false;
+    const paint = () => {
+      queued = false;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+      if (Math.abs(p - last) < 0.005) return;   // 无意义的变化不写样式
+      last = p;
+      fill.style.transform = 'scaleX(' + p.toFixed(4) + ')';
+    };
+    const onScroll = () => { if (!queued) { queued = true; requestAnimationFrame(paint); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    paint();
+  }
+
+  window.__revealIO = window.__revealIO || null;
 })();
 
-/* ========== 4. 报名表：阶段 / 验证码 / 编辑码 ========== */
+/* ========== 2. 代码带：方向 → 切档 ==========
+   背景的代码带由 codefield.js 驱动（打字 / 打错删除 / 整行重写 / 拉依赖 / 终端）。
+
+   这里只做一件事：把「点方向行」接到场上。
+   以前这里有第二个 hero 差异面板（.diff），它已经被代码带本身取代了 ——
+   代码现在是整页的背景，不是页面里的一个组件。
+*/
+(() => {
+  const select = document.getElementById('direction');
+  const applySec = document.getElementById('apply');
+  const hint = document.getElementById('dir-hint');
+  const rows = [...document.querySelectorAll('.dir-row')];
+
+  function pick(row) {
+    const dir = row.dataset.direction;
+    const key = row.dataset.dir;          // sw / hw / al / ai —— 和 codefield 的文档 id 一致
+    if (!dir || !select) return;
+    select.value = dir;
+    rows.forEach((r) => r.setAttribute('aria-pressed', String(r === row)));
+
+    // 背景切到对应方向。手动选过之后就停掉自动轮播，别打断用户。
+    const cf = window.codefield;
+    if (cf && cf.go && key) { cf.pause(); cf.go(key); }
+
+    if (hint) hint.textContent = '已选「' + dir + '」，继续填报名表。';
+    applySec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const el = document.getElementById('student_id');
+      if (el) el.focus({ preventScroll: true });
+    }, 700);
+  }
+
+  rows.forEach((row) => row.addEventListener('click', () => pick(row)));
+})();
+
+
+/* ========== 3. 报名表：阶段 / 验证码 / 编辑码 / 完成度 ========== */
 (() => {
   const form = document.getElementById('app-form');
   if (!form) return;
@@ -141,6 +153,9 @@
   const editTokenInput = document.getElementById('edit_token_input');
   const editStartBtn = document.getElementById('edit-start');
   const formFoot = document.getElementById('form-foot');
+  const phaseText = document.getElementById('phase-text');
+  const meterFill = document.getElementById('meter-fill');
+  const docProgress = document.getElementById('doc-progress');
 
   const LS_KEY = 'recruit.submissions.v1';
   const state = { config: null, mode: 'create', captchaId: null, honeypotName: 'website', editing: null };
@@ -163,6 +178,25 @@
     } catch { return d.toLocaleString(); }
   }
 
+  /* ---- 完成度读数：同一条信号线，这次它反映真实状态 ---- */
+  const requiredFields = [...form.querySelectorAll('[required]')];
+  const meterTotal = requiredFields.length || 1;
+
+  function updateMeter() {
+    let done = 0;
+    for (const el of requiredFields) {
+      if (el === captchaInput) { if ((el.value || '').trim()) done++; continue; }
+      if ((el.value || '').trim()) done++;
+    }
+    if (docProgress) docProgress.textContent = done + ' / ' + meterTotal;
+    if (meterFill) meterFill.style.transform = 'scaleX(' + (done / meterTotal).toFixed(4) + ')';
+  }
+
+  form.addEventListener('input', updateMeter);
+  form.addEventListener('change', updateMeter);
+  form.addEventListener('reset', () => setTimeout(updateMeter, 0));
+  updateMeter();
+
   /* ---- 本设备已提交记录（便利副本，不是安全控制） ---- */
   function loadSubs() {
     try {
@@ -172,11 +206,7 @@
   }
   function saveSub(token, sidFull) {
     const list = loadSubs().filter((x) => x.sid_full !== sidFull);
-    list.push({
-      token, sid_full: sidFull,
-      sid_masked: maskSid(sidFull),
-      at: new Date().toISOString(),
-    });
+    list.push({ token, sid_full: sidFull, sid_masked: maskSid(sidFull), at: new Date().toISOString() });
     try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch { /* 隐私模式忽略 */ }
   }
   function maskSid(s) {
@@ -193,7 +223,7 @@
 
     const title = document.createElement('p');
     title.className = 'device-title';
-    title.textContent = '本设备曾提交过报名：';
+    title.textContent = '本设备曾提交过报名';
     deviceCard.appendChild(title);
 
     const list = document.createElement('ul');
@@ -249,19 +279,26 @@
   captchaImg.addEventListener('click', refreshCaptcha);
   captchaRefresh.addEventListener('click', () => {
     captchaInput.value = '';
+    updateMeter();
     refreshCaptcha();
   });
 
   /* ---- 阶段状态 ---- */
+  const PHASE_TEXT = { warmup: '预热中', signup: '报名开放', review: '初筛面试', result: '结果公布' };
+
   function applyPhase(cfg) {
     const open = cfg.registration && cfg.registration.open;
     const phase = cfg.phase;
+
+    if (phaseText) phaseText.textContent = PHASE_TEXT[phase] || '招新中';
+
     document.querySelectorAll('.tl-item').forEach((el) => {
       const p = el.dataset.phase;
       el.classList.remove('tl-active', 'tl-done');
       if (p === phase) el.classList.add('tl-active');
       if (phase === 'signup' && p === 'warmup') el.classList.add('tl-done');
       if (phase === 'review' && (p === 'warmup' || p === 'signup')) el.classList.add('tl-done');
+      if (phase === 'result' && p !== 'result') el.classList.add('tl-done');
     });
 
     if (open) { phaseBanner.hidden = true; setFormDisabled(false); return; }
@@ -291,7 +328,7 @@
       el.disabled = disabled;
     }
     form.classList.toggle('is-closed', disabled);
-    submitBtn.textContent = disabled ? '报名未开放' : (state.mode === 'edit' ? '保存修改 →' : '提交报名 →');
+    submitBtn.textContent = disabled ? '报名未开放' : (state.mode === 'edit' ? '保存修改' : '提交报名');
   }
 
   /* ---- 提交 ---- */
@@ -361,6 +398,7 @@
         if (state.mode === 'edit') exitEditMode();
         form.reset();
         captchaInput.value = '';
+        updateMeter();
         await refreshCaptcha();
         showStatus('✓ ' + (data.message || '提交成功'), 'ok');
         return;
@@ -372,18 +410,20 @@
         haveTokenWrap.hidden = false;
         editTokenInput.focus();
         captchaInput.value = '';
+        updateMeter();
         await refreshCaptcha();
         return;
       }
 
       showStatus('✗ ' + (data.message || '提交失败，请重试'), 'err');
       captchaInput.value = '';
+      updateMeter();
       await refreshCaptcha();
     } catch {
       showStatus('✗ 网络错误，请稍后重试', 'err');
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = state.mode === 'edit' ? '保存修改 →' : '提交报名 →';
+      submitBtn.textContent = state.mode === 'edit' ? '保存修改' : '提交报名';
     }
   });
 
@@ -443,11 +483,12 @@
       fd.student_id.readOnly = true;
       editBanner.hidden = false;
       editBannerText.textContent = `正在修改 ${maskSid(c.student_id)} 的报名`;
-      submitBtn.textContent = '保存修改 →';
+      submitBtn.textContent = '保存修改';
       haveTokenWrap.hidden = true;
       showStatus('已载入你的报名信息，修改后填验证码提交。', 'ok');
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
       captchaInput.value = '';
+      updateMeter();
       await refreshCaptcha();
     } catch {
       showStatus('✗ 网络错误，请稍后重试', 'err');
@@ -459,11 +500,12 @@
     state.editing = null;
     form.elements.student_id.readOnly = false;
     editBanner.hidden = true;
-    submitBtn.textContent = '提交报名 →';
+    submitBtn.textContent = '提交报名';
   }
   editCancel.addEventListener('click', () => {
     exitEditMode();
     form.reset();
+    updateMeter();
     showStatus('');
   });
 
@@ -486,7 +528,7 @@
       if (!data.ok || !data.announcements.length) {
         const p = document.createElement('p');
         p.className = 'hint';
-        p.textContent = '暂无公告';
+        p.textContent = '暂无公告。报名开放、面试安排都会在这里和招新群同步。';
         box.appendChild(p);
         return;
       }
@@ -499,6 +541,7 @@
         meta.className = 'notice-meta';
         meta.textContent = (a.pinned ? '置顶 · ' : '');
         const t = document.createElement('span');
+        t.className = 'mono';
         t.textContent = fmtCN(a.published_at);
         meta.appendChild(t);
         // 纯文本渲染：不解析 Markdown/HTML
@@ -512,7 +555,7 @@
       box.textContent = '';
       const p = document.createElement('p');
       p.className = 'hint';
-      p.textContent = '公告加载失败';
+      p.textContent = '公告加载失败，请刷新重试。';
       box.appendChild(p);
     }
   }
@@ -527,7 +570,7 @@
     img.addEventListener('load', () => { fallback.textContent = ''; });
     img.addEventListener('error', () => {
       img.hidden = true;
-      fallback.textContent = '招新群二维码暂未配置，请稍后再来，或通过下方邮箱联系我们。';
+      fallback.textContent = '招新群二维码暂未配置。请稍后再来，或通过下方邮箱联系我们。';
     });
     // 每次加载都带时间戳，避免中间层缓存住旧图
     img.src = '/api/wechat-qr?t=' + Date.now();
@@ -576,7 +619,7 @@
   }, 300);
 })();
 
-/* ========== 5. 友情链接 ========== */
+/* ========== 4. 友情链接 ========== */
 (() => {
   const list = document.getElementById('link-list');
   if (!list) return;
@@ -588,7 +631,7 @@
       if (!data.ok || !data.links.length) {
         const p = document.createElement('p');
         p.className = 'hint';
-        p.textContent = '暂无友情链接';
+        p.textContent = '暂无友情链接。';
         list.appendChild(p);
         return;
       }
@@ -596,6 +639,8 @@
         const card = document.createElement('article');
         card.className = 'link-card reveal';
         card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-expanded', 'false');
 
         const nameRow = document.createElement('div');
         nameRow.className = 'name';
@@ -616,18 +661,13 @@
         openBtn.target = '_blank';
         openBtn.rel = 'noopener noreferrer';
         openBtn.textContent = '在新标签页打开 ↗';
-        openBtn.style.pointerEvents = 'none';
-        openBtn.style.opacity = '0.5';
-        openBtn.tabIndex = -1;
 
         card.append(nameRow, desc, openBtn);
 
+        // 展开态完全由 CSS 控制（.open 决定 display），不用行内样式
         const toggle = () => {
           const isOpen = card.classList.toggle('open');
-          desc.style.pointerEvents = isOpen ? 'auto' : 'none';
-          openBtn.style.pointerEvents = isOpen ? 'auto' : 'none';
-          openBtn.style.opacity = isOpen ? '1' : '0.5';
-          openBtn.tabIndex = isOpen ? 0 : -1;
+          card.setAttribute('aria-expanded', String(isOpen));
         };
         card.addEventListener('click', (e) => {
           if (e.target === openBtn || openBtn.contains(e.target)) return;
@@ -638,6 +678,7 @@
         });
         list.appendChild(card);
       });
+
       const io = new IntersectionObserver((entries) => {
         for (const en of entries) {
           if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); }
@@ -649,7 +690,7 @@
       list.textContent = '';
       const p = document.createElement('p');
       p.className = 'hint';
-      p.textContent = '友情链接加载失败';
+      p.textContent = '友情链接加载失败。';
       list.appendChild(p);
     });
 })();

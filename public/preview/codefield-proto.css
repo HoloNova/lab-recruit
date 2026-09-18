@@ -1,0 +1,286 @@
+/* 原型外壳 —— 玻璃卡片 + 页面上侧一条活的代码带。
+   ⚠ 必须放外部文件：服务的 CSP 是 default-src 'self'，内联 <style>/<script> 会被拦掉。 */
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+
+body {
+  margin: 0;
+  /* 深冷蓝灰，不是纯黑。
+     玻璃卡片是靠「比底色略深/略浅 + 边缘高光」被看见的；
+     底色要是纯黑，卡片和背景就是同一个黑，只剩描边能看。
+     这一层底色是让玻璃成立的地基。 */
+  background: #0a0c12;
+  color: #e8e8e8;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   氛围层：一层很淡的色斑，铺满整页，z-index 0。
+
+   为什么需要它：玻璃要「有东西可透」才看得出是玻璃。
+   代码带只占页面上侧，页面下半段是纯黑 ——
+   玻璃卡片飘在纯黑上，看上去就只是一块深灰，玻璃的质感全丢了。
+   这层色斑给了它可透的东西，所以整页的卡片都成立。
+
+   为什么用色斑而不是「模糊的代码」：色斑是静态 CSS 渐变，零成本；
+   模糊的代码要额外一层 backdrop-filter，在手机上太贵。
+   ============================================================ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    /* 极淡的点阵。玻璃要「看得出被糊过」，背后就得有**边缘**；
+       纯色渐变被模糊之后还是纯色，看不出差别。点阵提供了这些边缘。 */
+    radial-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+    radial-gradient(58% 38% at 12% 6%,  rgba(0, 110, 210, .30), transparent 70%),
+    radial-gradient(46% 30% at 92% 18%, rgba(132, 68, 172, .26), transparent 70%),
+    radial-gradient(54% 34% at 78% 62%, rgba(18, 140, 122, .21), transparent 72%),
+    radial-gradient(64% 40% at 24% 96%, rgba(196, 104, 12, .18), transparent 72%);
+  background-size: 22px 22px, auto, auto, auto, auto;
+}
+
+/* 内容层压在代码带（z1）之上 */
+.page { position: relative; z-index: 2 }
+
+/* ============================================================
+   玻璃卡片
+
+   三个要件，少一个就只是「半透明灰块」：
+     · backdrop-filter 模糊背后的东西 —— 这是「玻璃」本体
+     · 一道浅色描边 + 内上高光 —— 这是玻璃的**边缘**，最容易被忽略但最关键
+     · 圆角 + 下方阴影 —— 让它在黑底上浮起来
+
+   为什么要 saturate()：模糊会降低饱和度，画面会发灰。
+   补一点饱和，透过玻璃的代码颜色才不会被洗掉。
+   ============================================================ */
+.panel {
+  /* 34px 不是随便挑的：模糊越大，背后代码的亮峰被摊得越平，
+     于是**同样的可读性下可以放更低的 tint**。
+     实测（1440 与 390 两个宽度结论一致）：
+       blur 20 / tint .62  ← 旧值，38% 不透明，颜色丰富度 chP99 = 36
+       blur 34 / tint .22  ← 现值，78% 不透明，颜色丰富度 chP99 = 66
+     也就是说：更透明，同时透进来的颜色反而更清楚。
+     弱文字对比度也从 5.45 升到 6.66:1。 */
+  --glass-blur: 34px;
+
+  /* ⚠ 深色 tint，而且要**压暗**背后，不能提亮。
+
+     这一组数字都是采像素量出来的，走过两条弯路：
+       1) 深 tint（.62）压**纯黑**底 → 卡片自己就是近黑，除描边什么都看不见
+       2) 浅膜（6.8% 白）+ brightness(1.12) saturate(195%)
+          → 把背后的代码放大了，浅灰文字压上去只有 2.09:1，不能用
+
+     现在这条路：底色不是纯黑（见 body），深 tint 压住代码的亮部，
+     卡片和底色的层次靠「边缘高光 + 斜向反光」拉，不靠填充色拉 ——
+     真实磨砂深色玻璃就是这么做的：填充压暗，光都在边上。
+
+     透明度 78%。实测卡片填充与页底的亮度差只有 0.0015 ——
+     也就是说这张卡「是不是一块面」**一直**是靠边缘（描边 + 高光 + 阴影）
+     定义的，不是靠填充。所以把填充调淡几乎不损失卡片感，
+     这也是敢调到 .22 的依据。
+
+     brightness(.85) 是**压暗**背后，不是提亮 —— 方向反了就全错。 */
+  --glass-tint: rgba(9, 11, 16, .22);
+
+  position: relative;
+  background: var(--glass-tint);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 18px;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%) brightness(.85);
+  backdrop-filter: blur(var(--glass-blur)) saturate(170%) brightness(.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .34),      /* 顶边高光：填充淡了，它担起卡片的形状 */
+    inset 0 -1px 0 rgba(0, 0, 0, .32),
+    inset 0 0 0 1px rgba(255, 255, 255, .03),
+    0 20px 52px -14px rgba(0, 0, 0, .8);
+}
+
+/* 玻璃的斜向反光。很淡，但缺了它整块就像一片塑料。
+   用伪元素而不是 border-image：不参与布局，也不会被 backdrop-filter 影响。 */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(148deg,
+    rgba(255, 255, 255, .10) 0%,
+    rgba(255, 255, 255, .03) 26%,
+    transparent 52%);
+}
+
+/* 不支持 backdrop-filter 时别变成看不清的灰块：退回不透明 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel { background: #141518; border-color: #292b31 }
+}
+
+/* ---------- 页面骨架 ---------- */
+.sec { position: relative; z-index: 2 }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 14px }
+@media (min-width: 900px) { .wrap { padding: 0 40px } }
+
+.sec .panel { padding: 24px 18px 26px }
+@media (min-width: 900px) { .sec .panel { padding: 32px 34px 36px } }
+
+/* 卡片之间的间距。代码带在背后，这些空隙就是它的呼吸区。 */
+.gap { height: 58px }
+@media (min-width: 900px) { .gap { height: 92px } }
+
+/* ============================================================
+   hero
+
+   ⚠ 这里**不能**用 --cf-h 做顶部留白。
+     之前是 padding-top: calc(var(--cf-h) - 56px)，等于「背景把卡片往下推」——
+     正是要改掉的行为。现在页面从顶部开始排版，代码带纯粹是背后的东西。
+   ============================================================ */
+.hero { display: flex; align-items: flex-start; padding: 18px 14px 0 }
+.hero-panel { width: 100%; padding: 22px 20px 24px }
+
+@media (min-width: 900px) {
+  .hero { padding: 26px 40px 0 }
+  /* 卡片横跨内容宽度，所以一定压在左侧的代码上 —— 玻璃才有东西可透。
+     里面的文案排左、按钮排右，宽度撑满但不显空。 */
+  .hero-panel {
+    max-width: 1120px; margin: 0 auto;
+    padding: 30px 34px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 32px; align-items: center;
+  }
+  .hero-act { padding-top: 2px }
+  .hero-copy .lede { max-width: 46em }
+}
+
+h1 { margin: 0 0 8px; font-size: 26px; font-weight: 660; letter-spacing: -.02em; line-height: 1.22 }
+@media (min-width: 900px) { h1 { font-size: 35px } }
+
+.sub {
+  margin: 0 0 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase;
+  color: #b0b8c4;
+}
+.lede { margin: 0 0 18px; font-size: 15px; line-height: 1.72; color: #d6d9de }
+.lede-quiet { color: #b4bcc6; font-size: 13.5px; margin: 0 }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px }
+.tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; padding: 5px 10px; min-height: 28px;
+  display: inline-flex; align-items: center;
+  border: 1px solid currentColor; border-radius: 999px;
+  color: var(--dir);
+  background: rgba(255, 255, 255, .035);
+}
+.tag[data-dir="软件"]     { --dir: var(--dir-sw) }
+.tag[data-dir="硬件"]     { --dir: var(--dir-hw) }
+.tag[data-dir="算法"]     { --dir: var(--dir-al) }
+.tag[data-dir="人工智能"] { --dir: var(--dir-ai) }
+
+.cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 48px; padding: 0 26px; border: 0; border-radius: 999px;
+  background: var(--ed-accent, #0078d4); color: #fff;
+  font-size: 16px; font-weight: 620; cursor: pointer; font-family: inherit;
+  box-shadow: 0 8px 24px -8px rgba(0, 120, 212, .8);
+}
+
+h2 { margin: 0 0 5px; font-size: 18px; font-weight: 660 }
+.kicker {
+  margin: 0 0 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; color: #b0b8c4;
+}
+
+/* 方向表：点一行就把背景切到那个方向 */
+.dir-row {
+  display: grid; grid-template-columns: auto 1fr; gap: 3px 14px;
+  width: 100%; text-align: left; align-items: baseline;
+  padding: 13px 6px; min-height: 56px;
+  background: none; border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  color: inherit; font: inherit; cursor: pointer;
+  border-radius: 8px;
+}
+.dir-row:last-child { border-bottom: 1px solid rgba(255, 255, 255, .08) }
+.dir-row:hover { background: rgba(255, 255, 255, .045) }
+.dir-row[aria-pressed="true"] { background: rgba(255, 255, 255, .07) }
+.dir-cn { font-size: 17px; font-weight: 640; color: var(--dir); grid-row: span 2 }
+.dir-row[data-id="sw"] { --dir: var(--dir-sw) }
+.dir-row[data-id="hw"] { --dir: var(--dir-hw) }
+.dir-row[data-id="al"] { --dir: var(--dir-al) }
+.dir-row[data-id="ai"] { --dir: var(--dir-ai) }
+.dir-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; color: #b0b8c4;
+}
+.dir-note { font-size: 13.5px; color: #d6d9de; grid-column: 2 }
+
+/* git log 形式的流程 */
+.log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px; line-height: 2.15;
+}
+.log i { display: inline-block; width: 12px; color: #b0b8c4 }
+.log b { font-weight: 620; color: #e8e8e8 }
+.log em { font-style: normal; color: #b4bcc6 }
+
+/* ---------- 报名表字段（演示「输入即暂停」） ---------- */
+.fields { display: grid; gap: 12px; margin-top: 16px }
+@media (min-width: 620px) { .fields { grid-template-columns: 1fr 1fr } }
+.fld { display: block }
+.fld > span {
+  display: block; margin-bottom: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; color: #b0b8c4;
+}
+.fld input, .fld select {
+  width: 100%;
+  min-height: 44px;                     /* 触控目标下限 */
+  padding: 0 12px;
+  /* 输入框也用玻璃：浅一档的 tint，边框比卡片亮一点 */
+  background: rgba(9, 11, 16, .34);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 10px;
+  color: #e8e8e8;
+  font: inherit;
+  font-size: 16px;                      /* <16px 时 iOS 聚焦会放大整页 */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.fld input:focus, .fld select:focus {
+  outline: 2px solid var(--ed-accent, #4da3e8);
+  outline-offset: 1px;
+  background: rgba(255, 255, 255, .08);
+}
+
+/* ---------- 开发控制条（正式版删掉） ---------- */
+.ctl {
+  position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
+  height: 56px; display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; overflow-x: auto;
+  background: rgba(0, 0, 0, .55);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  color: #fff; font-size: 13px;
+}
+.ctl b { font-weight: 620; margin-right: 4px; white-space: nowrap; color: #b4bcc6 }
+.ctl button {
+  min-height: 44px; padding: 0 13px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .06);
+  color: #fff; font: inherit; cursor: pointer; white-space: nowrap;
+}
+.ctl button[aria-pressed="true"] {
+  background: #fff; color: #0b0b0d; border-color: #fff;
+}
+
+/* 页面底部给固定的开发控制条留出位置（正式版删掉） */
+.foot-pad { height: 76px }

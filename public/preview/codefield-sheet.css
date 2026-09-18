@@ -1,0 +1,53 @@
+/* 静态对照表的样式（外部文件：CSP 是 style-src 'self'） */
+* { box-sizing: border-box }
+body {
+  margin: 0; padding: 26px 20px 60px;
+  background: var(--ed-bg-2, #262626);
+  color: var(--ed-fg, #ccc);
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+.sheet-head { max-width: 1180px; margin: 0 auto 24px }
+.sheet-head h1 { margin: 0 0 10px; font-size: 21px; font-weight: 650 }
+.sheet-head p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.7; color: var(--ed-fg-2, #8a9199) }
+.theme-switch { display: flex; gap: 8px; flex-wrap: wrap }
+.theme-switch button {
+  min-height: 34px; padding: 0 14px; font: inherit; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--ed-border, #2b2b2b); border-radius: 2px;
+  background: transparent; color: var(--ed-fg, #ccc);
+}
+.theme-switch button[aria-pressed="true"] {
+  background: var(--ed-accent, #0078d4); border-color: var(--ed-accent, #0078d4); color: #fff;
+}
+
+.sheet { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px }
+
+.case { }
+.case-label {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.case-dir {
+  font-size: 14px; font-weight: 650;
+  color: var(--dir);
+  border-left: 3px solid var(--dir);
+  padding-left: 8px;
+}
+.case[data-id="sw"] .case-dir { --dir: var(--dir-sw) }
+.case[data-id="hw"] .case-dir { --dir: var(--dir-hw) }
+.case[data-id="al"] .case-dir { --dir: var(--dir-al) }
+.case[data-id="ai"] .case-dir { --dir: var(--dir-ai) }
+.case-meta { font-size: 12px; color: var(--ed-fg-2, #8a9199); font-family: ui-monospace, Menlo, Consolas, monospace }
+.case-note { font-size: 12.5px; color: var(--ed-fg-2, #8a9199) }
+
+/* 两列：手机上单列 */
+.case-cols { display: grid; grid-template-columns: 1fr; gap: 14px }
+@media (min-width: 1100px) { .case-cols { grid-template-columns: 1fr 300px } }
+.case-side { font-size: 12.5px; line-height: 1.7; color: var(--ed-fg-2, #8a9199) }
+.case-side dl { margin: 0 }
+.case-side dt { color: var(--ed-fg, #ccc); margin-top: 8px }
+.case-side dd { margin: 2px 0 0 }
+.case-side code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--syn-fn, #dcdcaa);
+}

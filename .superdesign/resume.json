@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/": {
+      "targetKind": "existing-ui",
+      "projectId": "9f5d7ab3-fb8b-4701-8cf9-8d2beb9af98b",
+      "baselineDraftId": "af4dc328-3645-4965-8a7c-5529dba875bf",
+      "activeDraftId": "952740a8-0a4e-4943-ba2f-df4c16c30159",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/drafts/session.css",
+        "public/index.html",
+        "public/codefield.css",
+        "themes/02-editor-dark.css",
+        "public/app.js",
+        ".superdesign/drafts/base.css",
+        ".superdesign/drafts/d1-trace.css",
+        ".superdesign/drafts/d2-hazard.css",
+        ".superdesign/drafts/d3-scan.css",
+        ".superdesign/drafts/build-dir.js"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "b0c2c4b5a0f628cbedffd472b4642074cd3851560fcf09dba58938ed83d7f670",
+        ".superdesign/drafts/session.css": "3512f391bd30c16d2b2fa4c704ce19ff76b17052328b75a233a7d7a9be9dda10",
+        "public/index.html": "0e7e566cfc14df5a60cdfd813693e9a55ad6be3f7452747026087ba2e6369f06",
+        "public/codefield.css": "cded2029742f1ed77aa4d586d1b62c06ec0eadc9940d0ac95602cf143065a516",
+        "themes/02-editor-dark.css": "53eae5b9180747640720910518a9856fcc6cce5889b962aef41daffa2bf5460f",
+        "public/app.js": "0c75eb5f9990092ba1e57a4dbdb93cadc2d13a866bf5f1e40d95e78800d5023c",
+        ".superdesign/drafts/base.css": "77ee5463babb2ac4e32027e0833065156160738ce353173d3db6d55371bb2a99",
+        ".superdesign/drafts/d1-trace.css": "f3ccbb22f8c2bce03927b6235ef36a14fd77aaeb8018fa0c4c3d0184c6142c48",
+        ".superdesign/drafts/d2-hazard.css": "e55f3a6259cfea3b34a43c6492682aa84cedf6c2056d548859b590181ef14844",
+        ".superdesign/drafts/d3-scan.css": "8c74bb51d6d6ac3c4cf9c1548324c783852c7ed3bf42950b18184dc4d7001950",
+        ".superdesign/drafts/build-dir.js": "cb318a5dc08f6cb4a01d8813b3fa8bf59697862894f8c74972d01cb40228587f"
+      },
+      "drafts": {
+        "af4dc328-3645-4965-8a7c-5529dba875bf": {
+          "title": "改动前 · 像素复刻（现状）",
+          "visualDirection": "as-built ground truth（复刻基准，不参与重设计）",
+          "currentVersion": 2
+        },
+        "f68de4ec-b264-4e4b-962c-e67b755a2f2e": {
+          "title": "Graphite Console · 冷石墨控制台（方案 A）",
+          "visualDirection": "冷石墨控制台 · 精密发丝线 · 玻璃卡（上一轮的 A，已退役为对照）",
+          "currentVersion": 2
+        },
+        "84ec152b-ec84-4170-8d26-8cf706dbf0bd": {
+          "title": "Graphite Nebula · 冷光控制台（方案 B）",
+          "visualDirection": "冷光扫描线 · 单色相氛围（上一轮的 B，已退役为对照）",
+          "currentVersion": 2
+        },
+        "952740a8-0a4e-4943-ba2f-df4c16c30159": {
+          "title": "Session · 全场域会话（方案 C · 桌面）",
+          "visualDirection": "整屏场域 + 玻璃卡片压在代码上（内层 .22/外层 .24，blur 16/14）+ 拇指区状态栏；草稿内联真实打字引擎",
+          "currentVersion": 3
+        },
+        "6d40b706-ba6f-4915-8524-0a50674a659e": {
+          "title": "Session · 全场域会话（方案 C · 手机）",
+          "visualDirection": "同上（390px 视口孪生稿：场域在背后、文档块挖在场域上）",
+          "parentDraftId": "952740a8-0a4e-4943-ba2f-df4c16c30159",
+          "currentVersion": 3
+        },
+        "b5f15f80-dcd2-433c-a0a9-b637ab96b7af": {
+          "title": "候选 D1 · 薄纸 TRACE（桌面）",
+          "visualDirection": "浅色报告压在运行中的机器上；0.88 透光纸；首页证据窗；回执式报名表",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d1-trace.css",
+          "parentDraftId": null
+        },
+        "39388558-c421-4352-841b-d443d64b37ff": {
+          "title": "候选 D1 · 薄纸 TRACE（手机）",
+          "visualDirection": "同上 390px 孪生稿",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d1-trace.css",
+          "parentDraftId": null
+        },
+        "f254d0dd-02a2-4649-9ae0-2968fb5e6581": {
+          "title": "候选 D2 · 警戒线 HAZARD（桌面）",
+          "visualDirection": "墨黑 + 警戒黄胶带作为结构；等宽海报字；左侧固定胶带",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d2-hazard.css",
+          "parentDraftId": null
+        },
+        "58fb2570-351e-4063-ad09-7222abd94795": {
+          "title": "候选 D2 · 警戒线 HAZARD（手机）",
+          "visualDirection": "同上 390px 孪生稿",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d2-hazard.css",
+          "parentDraftId": null
+        },
+        "fa3f3a71-536b-439c-9edd-c60060bc9edd": {
+          "title": "候选 D3 · 扫描 SCAN（桌面）",
+          "visualDirection": "四个方向＝活的扫描结果表（即机器档位）；编号节点流程；右侧竖排阶段轨道",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d3-scan.css",
+          "parentDraftId": null
+        },
+        "0cec9e40-a380-4701-b0be-527ab08f86ba": {
+          "title": "候选 D3 · 扫描 SCAN（手机）",
+          "visualDirection": "同上 390px 孪生稿",
+          "currentVersion": 1,
+          "sourceLayer": ".superdesign/drafts/d3-scan.css",
+          "parentDraftId": null
+        }
+      },
+      "assembly": {
+        "note": "本目标不靠模型生成 HTML：草稿由 extract.js→build-session.js 用真实源码拼装（内联 codefield.js 使它真的会打字），再用 import-design-draft 上传。设计层唯一真相 = .superdesign/drafts/session.css ｜ 本轮新增三个候选方向：base.css（机制）+ dN-*.css（设计层）+ build-dir.js 拼装 + verify-dir/presence 自检",
+        "scripts": [
+          ".superdesign/drafts/extract.js",
+          ".superdesign/drafts/build-session.js",
+          ".superdesign/drafts/verify-session.js",
+          ".superdesign/drafts/contrast.js"
+        ],
+        "inputs": [
+          ".superdesign/tmp/parts.json（gitignore）"
+        ]
+      },
+      "updatedAt": "2026-09-12T09:13:09.364717Z"
+    }
+  }
+}

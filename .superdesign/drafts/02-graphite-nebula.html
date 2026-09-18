@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="editor-dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Graphite Nebula · 冷光控制台（方案 B）</title>
+<meta name="description" content="网络攻防与信息安全实验室招新 —— 软件 / 硬件 / 算法 / 人工智能">
+<style data-source="themes/02-editor-dark.css">
+/* ============================================================
+   主题 02 · 编辑器（深色）
+   取自 VSCode 默认深色主题（extensions/theme-defaults）。
+
+   ⚠ 这里有两处刻意偏离 VSCode 原生值，因为原生值不达 WCAG：
+     editorLineNumber.foreground #6E7681 → 3.59:1  ✗  改用 #8a9199 = 5.17:1
+     focusBorder               #0078D4 → 3.64:1  ✗  改用 #4da3e8 = 6.06:1
+   浅色主题下这两个原生值是 4.59:1 / 6.31:1，达标，所以照用。
+
+   对比度（对 --ed-bg 实算）：
+     --ed-fg      #cccccc  10.26:1  AAA
+     --ed-fg-2    #8a9199   5.17:1  AA
+     --ed-gutter  #8a9199   5.17:1  AA
+     --ed-accent  #4da3e8   6.06:1  AA
+     --ed-add     #4ec9b0   8.09:1  AAA
+     --ed-del     #f48771   6.71:1  AA
+   ============================================================ */
+
+[data-theme="editor-dark"] {
+  /* 表面 */
+  --ed-bg: #1f1f1f;
+  --ed-bg-2: #262626;
+  --ed-guide: #3a3a3a;
+
+  /* 文字 */
+  --ed-fg: #cccccc;
+  --ed-fg-2: #8a9199;
+  --ed-gutter: #8a9199;
+
+  /* 语义 */
+  --ed-accent: #4da3e8;
+  --ed-add: #4ec9b0;
+  --ed-del: #f48771;
+
+  /* 四个方向 —— 深底上整体提亮，保持与浅色主题相同的语义色相 */
+  --dir-sw: #4da3e8;
+  --dir-hw: #e0a458;
+  --dir-al: #c586e0;
+  --dir-ai: #4ec9b0;
+
+  /* ---------- 语法色：直接取 VSCode Dark+ 原生值 ----------
+     这 11 个色压在 --ed-bg #1f1f1f 上全部 ≥4.5:1（实算见计划 §4.1），
+     所以不需要为了对比度调色。这是「原生 VSCode」能成立的前提。 */
+  --syn-kw:    #569cd6;   /* 声明关键字  5.59:1 */
+  --syn-ct:    #c586c0;   /* 控制流      5.92:1 */
+  --syn-ty:    #4ec9b0;   /* 类型        8.09:1 */
+  --syn-fn:    #dcdcaa;   /* 函数/注解  11.66:1 */
+  --syn-va:    #9cdcfe;   /* 变量       11.05:1 */
+  --syn-st:    #ce9178;   /* 字符串      6.24:1 */
+  --syn-nu:    #b5cea8;   /* 数字        9.70:1 */
+  --syn-cm:    #6a9955;   /* 注释        4.95:1 */
+  --syn-an:    #dcdcaa;
+  --syn-pp:    #569cd6;   /* 预处理 */
+  --syn-op:    #d4d4d4;
+
+  /* 编辑器界面色 */
+  --syn-ln:    #8a9199;   /* 行号    5.17:1（原生 #6e7681 只有 3.59，已修正） */
+  --syn-caret: #aeafad;
+  --syn-sel:   #264f78;   /* 选区蓝 */
+}
+
+</style>
+<style data-source="public/style.css">
+/* ============================================================
+   网络攻防与信息安全 · 实验室招新
+
+   意象：代码是整个页面的背景，内容是一叠玻璃卡片，压在上面。
+
+     · 代码带钉在页面上侧（fixed），底部渐隐到页面底色
+     · 卡片是磨砂玻璃：透明、有边缘高光，背后的代码糊成颜色透出来
+     · 代码本身完全静止在 z0；内容在它上面滑过去
+
+   三条硬规则（改动前请先读）：
+   1. 颜色只在 themes/*.css 里定义。本文件一律用 var(--ed-x, 兜底) 消费。
+   2. 背景**不占版面**。代码带是 fixed 的，它的高度绝不参与内容排版 ——
+      任何形式的 `padding-top: calc(var(--cf-h) ...)` 都是回到旧错误：
+      卡片会被背景推下去。
+   3. 玻璃的参数是采像素量出来的，改动后必须重新量对比度（见报告）：
+      · 模糊半径是透明度的杠杆（越大 → 亮峰摊得越平 → tint 可以越低）
+      · backdrop-filter 必须**压暗**背后（brightness < 1），提亮会把代码放大
+      · 卡片可以很透，小控件（暂停徽标）不行
+
+   为什么整页是深色：代码带是深色编辑器，玻璃要「有东西可透」，
+   底色又必须是深冷灰而不是纯黑，否则卡片和背景是同一个黑。
+   浅色主题的令牌仍在 themes/01 里，但那个方向需要单独设计一轮。
+   ============================================================ */
+
+/* ---------- 主题令牌的本地别名（兜底 = 深色编辑器，见 themes/02） ---------- */
+:root {
+  --bg:      var(--ed-bg, #1f1f1f);
+  --bg-2:    var(--ed-bg-2, #262626);
+  --guide:   var(--ed-guide, #3a3a3a);
+  --fg:      var(--ed-fg, #cccccc);
+  --fg-2:    var(--ed-fg-2, #8a9199);
+  --gutter:  var(--ed-gutter, #8a9199);
+  --accent:  var(--ed-accent, #4da3e8);
+  --add:     var(--ed-add, #4ec9b0);
+  --del:     var(--ed-del, #f48771);
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", "PingFang SC", "HarmonyOS Sans SC",
+             "MiSans", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-code: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+               "Liberation Mono", "Roboto Mono", monospace;
+
+  /* 版式：手机段固定刻度 */
+  --fs-h1: 30px;
+  --fs-h2: 21px;
+  --fs-h3: 18px;
+  --fs-dir: 18px;
+  --fs-body: 16px;
+  --fs-sm: 14.5px;
+  --fs-label: 12px;
+  --fs-code: 12.5px;
+  --fs-input: 17px;          /* ≥16px：低于此值 iOS 聚焦输入框会缩放整页 */
+  --lh-body: 1.72;
+  --lh-tight: 1.24;
+
+  --pad: 18px;
+  --radius: 14px;            /* 玻璃卡片的圆角 */
+  --radius-in: 10px;         /* 卡片内部的小圆角 */
+
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-io: cubic-bezier(.65, 0, .35, 1);
+  --ease-tap: cubic-bezier(.22, .61, .36, 1);
+  --d-tap: 160ms;
+  --d-reveal: 520ms;
+  --stagger: 55ms;
+
+  --top-h: 50px;
+}
+
+@media (max-width: 340px) {
+  :root { --pad: 14px; --fs-h1: 27px; --fs-body: 15.5px; }
+}
+
+@media (min-width: 600px) {
+  :root {
+    --fs-h1: clamp(30px, 4.6vw, 40px);
+    --fs-h2: clamp(21px, 3vw, 25px);
+    --fs-dir: clamp(18px, 2.3vw, 21px);
+    --fs-body: 17px;
+    --fs-sm: 15.5px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --pad: 30px;
+    --top-h: 56px;
+    --fs-h1: clamp(38px, 3.4vw, 50px);
+    --fs-h2: clamp(24px, 2.1vw, 29px);
+    --fs-h3: 20px;
+    --fs-dir: clamp(20px, 1.8vw, 26px);
+  }
+}
+
+/* ============================================================
+   基础
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  /* 底色不是纯黑：玻璃卡片是「比底色略亮的一层膜」，
+     底色要是纯黑，卡片和背景就是同一个黑，只剩描边能看。 */
+  background: #0a0c12;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #0a0c12;
+  color: #e8e8e8;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   氛围层：铺满整页的淡色斑 + 一层极淡点阵
+
+   为什么需要它：代码只占带子的左半边（约 360px），而卡片有 1100px 宽 ——
+   卡片大部分区域背后是空的，玻璃没东西可透。
+   色斑让玻璃到处都有颜色可糊；点阵提供**边缘**，
+   因为纯色渐变被模糊之后还是纯色，看不出「被糊过」。
+   ============================================================ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+    radial-gradient(58% 38% at 12% 6%,  rgba(0, 110, 210, .30), transparent 70%),
+    radial-gradient(46% 30% at 92% 18%, rgba(132, 68, 172, .26), transparent 70%),
+    radial-gradient(54% 34% at 78% 62%, rgba(18, 140, 122, .21), transparent 72%),
+    radial-gradient(64% 40% at 24% 96%, rgba(196, 104, 12, .18), transparent 72%);
+  background-size: 22px 22px, auto, auto, auto, auto;
+}
+
+::selection { background: rgba(77, 163, 232, .35); color: #fff; }
+
+.mono { font-family: var(--font-code); font-variant-numeric: tabular-nums; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+img { max-width: 100%; display: block; }
+
+/* 内容层：压在代码带（z1）之上 */
+.page { position: relative; z-index: 2; }
+
+/* ============================================================
+   顶部：一条很薄的玻璃条
+
+   它参与排版（sticky），所以内容从它下面开始 ——
+   这是导航栏的正常行为，和「背景把卡片推下去」是两回事：
+   代码带是 fixed 的，它的高度不参与任何排版。
+   ============================================================ */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) brightness(.82);
+  backdrop-filter: blur(18px) saturate(160%) brightness(.82);
+  background: rgba(9, 11, 16, .40);
+  border-bottom: 1px solid rgba(255, 255, 255, .10);
+}
+
+.top-in {
+  max-width: 1120px;
+  margin: 0 auto;
+  min-height: var(--top-h);
+  padding: 0 var(--pad);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 一个「已打开的标签」—— 编辑器最容易识别的形态 */
+.tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .05);
+  text-decoration: none;
+  font-size: var(--fs-label);
+  line-height: 1.4;
+  min-height: 44px;              /* 触控目标下限 */
+  align-items: center;
+  white-space: nowrap;
+  max-width: 46vw;
+  overflow: hidden;
+}
+.tab-name { color: #e8e8e8; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.tab-ext { color: #9aa3b0; font-family: var(--font-code); }
+
+/* 阶段状态：像编辑器的状态栏文字 */
+.top-status {
+  align-self: center;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, .14);
+  font-family: var(--font-code);
+  font-size: var(--fs-label);
+  color: #b0b8c4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav { display: none; margin-left: auto; gap: 2px; }
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #b0b8c4;
+  text-decoration: none;
+  font-size: var(--fs-sm);
+}
+.nav a:hover { color: #fff; background: rgba(255, 255, 255, .07); }
+.nav a[aria-current="true"] { color: #fff; background: rgba(255, 255, 255, .10); }
+
+@media (min-width: 760px) { .nav { display: flex; } }
+
+.top-cta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;          /* 触控目标下限，别改小 */
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #06263f;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform var(--d-tap) var(--ease-tap);
+}
+.nav + .top-cta { margin-left: auto; }
+@media (min-width: 760px) { .top-cta { margin-left: 8px; } }
+.top-cta:hover { transform: scale(1.04); }
+.top-cta:active { transform: scale(.97); }
+
+/* 阅读进度：替掉被隐藏的滚动条，只在切段时更新 */
+.prog { height: 2px; background: rgba(255, 255, 255, .10); }
+.prog i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: var(--accent);
+}
+
+/* ============================================================
+   玻璃卡片
+
+   三个要件，少一个就只是「半透明灰块」：
+     · backdrop-filter 模糊背后的东西 —— 这是「玻璃」本体
+     · 一道浅色描边 + 内上高光 —— 这是玻璃的**边缘**，最容易被忽略但最关键
+     · 圆角 + 下方阴影 —— 让它在深底上浮起来
+
+   tint 只有 .22（78% 透明）。敢这么淡的依据是实测：
+   卡片填充与页底的亮度差只有 0.0015 —— 也就是说这张卡「是不是一块面」
+   一直靠边缘定义，不是靠填充。所以调淡填充几乎不损失卡片感。
+   而边框/高光因此必须顶上来担这个责任。
+   ============================================================ */
+.shell,
+.hero-in {
+  position: relative;
+  background: rgba(9, 11, 16, .22);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(34px) saturate(170%) brightness(.85);
+  backdrop-filter: blur(34px) saturate(170%) brightness(.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .34),
+    inset 0 -1px 0 rgba(0, 0, 0, .30),
+    0 20px 52px -14px rgba(0, 0, 0, .80);
+}
+
+/* 斜向反光：很淡，但缺了整块就像一片塑料。
+   用伪元素而不是 border-image：不参与布局，也不被 backdrop-filter 影响。 */
+.shell::before,
+.hero-in::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(148deg,
+    rgba(255, 255, 255, .10) 0%,
+    rgba(255, 255, 255, .03) 26%,
+    transparent 52%);
+}
+
+/* 不支持 backdrop-filter 时别变成看不清的灰块：退回不透明 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell, .hero-in { background: #14161c; border-color: rgba(255, 255, 255, .14); }
+}
+
+/* ============================================================
+   区块骨架
+
+   ⚠ 注意 padding-top：这里**没有**任何基于 --cf-h 的留白。
+      代码带是 fixed 的，高度不参与排版 —— 内容从页面顶部开始。
+   ============================================================ */
+.sec { padding: 0 var(--pad); }
+@media (min-width: 1024px) { .sec { padding: 0 40px; } }
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px var(--pad) 28px;
+}
+@media (min-width: 1024px) { .shell { padding: 34px 36px 40px; } }
+
+/* 卡片之间的间距：这些空隙里露出的是没被遮的代码带。 */
+.hero { margin-bottom: 54px; }
+.sec { margin-bottom: 54px; }
+@media (min-width: 1024px) {
+  .hero { margin-bottom: 84px; }
+  .sec { margin-bottom: 84px; }
+}
+.sec:last-of-type { margin-bottom: 0; }
+
+.hero { padding: 16px var(--pad) 0; }
+@media (min-width: 1024px) { .hero { padding: 22px 40px 0; } }
+.hero-in {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px var(--pad) 28px;
+}
+@media (min-width: 1024px) { .hero-in { padding: 34px 36px 38px; } }
+
+/* ---------- 标题族 ---------- */
+.h1 {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-tight);
+  font-weight: 660;
+  letter-spacing: -.022em;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.h2 {
+  font-size: var(--fs-h2);
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  color: #fff;
+  margin-bottom: 18px;
+}
+.h2-en {
+  display: block;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .10em;
+  color: #9aa3b0;
+  margin-bottom: 4px;
+}
+.h3 {
+  font-size: var(--fs-h3);
+  font-weight: 650;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.lede { color: #cfd4dc; margin-bottom: 20px; }
+.hint { color: #8f98a6; font-size: var(--fs-sm); }
+
+/* ---------- 主按钮 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #06263f;
+  font-family: inherit;
+  font-size: var(--fs-body);
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 10px 26px -10px rgba(77, 163, 232, .9);
+  transition: transform var(--d-tap) var(--ease-tap);
+}
+.btn:hover { transform: scale(1.03); }
+.btn:active { transform: scale(.98); }
+
+/* ============================================================
+   方向列表
+   ============================================================ */
+.dir-list { margin-bottom: 14px; }
+
+.dir-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  width: 100%;
+  padding: 14px 8px;
+  min-height: 60px;
+  background: none;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .10);
+  border-radius: var(--radius-in);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--d-tap) var(--ease-tap);
+}
+.dir-row:last-child { border-bottom: 1px solid rgba(255, 255, 255, .10); }
+.dir-row:hover { background: rgba(255, 255, 255, .05); }
+.dir-row[aria-pressed="true"] { background: rgba(255, 255, 255, .08); }
+
+.dir-cn {
+  grid-row: span 2;
+  font-size: var(--fs-dir);
+  font-weight: 650;
+  color: var(--dir);
+}
+.dir-row[data-dir="sw"] { --dir: var(--dir-sw, #4da3e8); }
+.dir-row[data-dir="hw"] { --dir: var(--dir-hw, #e0a458); }
+.dir-row[data-dir="al"] { --dir: var(--dir-al, #c586e0); }
+.dir-row[data-dir="ai"] { --dir: var(--dir-ai, #4ec9b0); }
+
+.dir-idx {
+  display: none;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: #7d8694;
+}
+.dir-code {
+  font-family: var(--font-code);
+  font-size: var(--fs-code);
+  color: #b0b8c4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dir-desc { grid-column: 2; color: #cfd4dc; font-size: var(--fs-sm); }
+
+@media (min-width: 600px) {
+  .dir-row { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; }
+  .dir-cn { grid-row: auto; grid-column: 1; }
+  .dir-code { grid-column: 1; }
+  .dir-desc { grid-column: 1; }
+  .dir-idx { display: block; grid-column: 2; }
+}
+
+/* ============================================================
+   流程（时间线）
+   ============================================================ */
+.tl { list-style: none; margin-bottom: 26px; }
+
+.tl-item {
+  position: relative;
+  padding-left: 26px;
+  padding-bottom: 20px;
+}
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before {                     /* 竖线 */
+  content: '';
+  position: absolute;
+  left: 5px; top: 14px; bottom: -2px;
+  width: 1px;
+  background: rgba(255, 255, 255, .14);
+}
+.tl-item:last-child::before { display: none; }
+.tl-item::after {                      /* 节点 */
+  content: '';
+  position: absolute;
+  left: 0; top: 7px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .30);
+  background: #0a0c12;
+}
+.tl-item.tl-done::after { background: var(--accent); border-color: var(--accent); }
+.tl-item.tl-active::after {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: node-pulse 2.4s var(--ease-io) infinite;
+}
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(77, 163, 232, .5); }
+  50%      { box-shadow: 0 0 0 7px rgba(77, 163, 232, 0); }
+}
+
+.tl-when {
+  display: block;
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: #9aa3b0;
+  margin-bottom: 3px;
+}
+.tl-title { font-size: var(--fs-h3); font-weight: 650; color: #fff; margin-bottom: 5px; }
+.tl-desc { color: #cfd4dc; font-size: var(--fs-sm); }
+.tl-desc strong { color: #fff; font-weight: 620; }
+
+/* ============================================================
+   公告
+   ============================================================ */
+.notices { border-top: 1px solid rgba(255, 255, 255, .10); padding-top: 18px; }
+.notice-list { display: grid; gap: 10px; }
+.notice {
+  padding: 12px 14px;
+  border-radius: var(--radius-in);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-left: 3px solid rgba(255, 255, 255, .22);
+}
+.notice.pinned { border-left-color: var(--accent); }
+.notice h3 { font-size: var(--fs-h3); font-weight: 640; color: #fff; margin-bottom: 4px; }
+.notice-meta {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: #8f98a6;
+  margin-bottom: 6px;
+}
+.notice-body { color: #cfd4dc; font-size: var(--fs-sm); }
+
+/* 报名表里的提示条：公告用的是同一套「一条边」语言 */
+.banner strong { color: #fff; font-weight: 620; }
+
+/* ---------- 「本设备已提交」卡片（app.js 动态生成） ---------- */
+.device-title {
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: .08em;
+  color: #b0b8c4;
+  margin-bottom: 10px;
+}
+.device-list { list-style: none; display: grid; gap: 8px; }
+.device-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  color: #e8e8e8;
+}
+
+/* ============================================================
+   报名表
+
+   .shell 是外层玻璃；.pane 是里面一层更淡的内衬面，
+   让「这是张表」这件事有个边界，但不至于套两层厚玻璃。
+   ============================================================ */
+.apply .shell { padding-bottom: 24px; }
+
+.pane {
+  border-radius: var(--radius-in);
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .09);
+  overflow: hidden;
+}
+
+.pane-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+  font-size: var(--fs-label);
+}
+.pane-name { font-weight: 640; color: #fff; }
+.pane-meta { color: #9aa3b0; font-family: var(--font-code); }
+
+/* 完成度读数：一条随必填项推进的线 */
+.pane-meter { height: 2px; background: rgba(255, 255, 255, .10); }
+.pane-meter i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: var(--accent);
+  transition: transform var(--d-morph, 320ms) var(--ease-out);
+}
+
+.pane-body { padding: 16px 14px 18px; }
+@media (min-width: 1024px) { .pane-body { padding: 20px 20px 24px; } }
+
+/* ---------- 提示条 ---------- */
+.banner {
+  padding: 12px 14px;
+  border-radius: var(--radius-in);
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+  color: #dfe4ea;
+  font-size: var(--fs-sm);
+  margin-bottom: 16px;
+}
+.edit-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.edit-banner .link-btn { flex: none; }
+
+/* ---------- 字段 ---------- */
+#app-form { display: grid; gap: 14px; }
+@media (min-width: 700px) {
+  #app-form { grid-template-columns: 1fr 1fr; gap: 16px 18px; }
+  #app-form .full { grid-column: 1 / -1; }
+}
+
+.field { display: block; min-width: 0; }
+.field > label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--fs-label);
+  font-family: var(--font-code);
+  color: #b0b8c4;
+}
+.req { color: var(--del); }
+.opt { color: #7d8694; }
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: var(--radius-in);
+  /* 输入框自己也带一点玻璃。卡片很透，所以框要比边框更明确一点才看得出是可输入的。 */
+  background: rgba(9, 11, 16, .34);
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #f0f2f5;
+  font-family: inherit;
+  font-size: var(--fs-input);
+  line-height: 1.5;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: border-color var(--d-tap) var(--ease-tap), background var(--d-tap) var(--ease-tap);
+}
+.field textarea { min-height: 96px; resize: vertical; padding: 12px; }
+.field input::placeholder,
+.field textarea::placeholder { color: #7d8694; }
+.field input:hover,
+.field select:hover,
+.field textarea:hover { border-color: rgba(255, 255, 255, .32); }
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+  background: rgba(9, 11, 16, .48);
+}
+.field select { appearance: none; padding-right: 34px; }
+.field { position: relative; }
+.field:has(select)::after {              /* 自制下拉箭头 */
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 34px;
+  width: 7px; height: 7px;
+  border-right: 2px solid #9aa3b0;
+  border-bottom: 2px solid #9aa3b0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.field option { background: #14161c; color: #f0f2f5; }
+
+/* ---------- 验证码 ---------- */
+.captcha-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: center;
+}
+@media (min-width: 520px) {
+  .captcha-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+}
+.captcha-img {
+  width: 150px;
+  height: 50px;
+  border-radius: var(--radius-in);
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .05);
+  cursor: pointer;
+}
+
+/* ---------- 链接式按钮 ---------- */
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  background: rgba(255, 255, 255, .06);
+  color: #e8e8e8;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.link-btn:hover { background: rgba(255, 255, 255, .12); }
+
+/* ---------- 提交区 ---------- */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #06263f;
+  font-family: inherit;
+  font-size: var(--fs-body);
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 10px 26px -10px rgba(77, 163, 232, .9);
+}
+.submit:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.form-status { font-size: var(--fs-sm); color: #b0b8c4; min-height: 1.4em; }
+.form-status.is-err { color: var(--del); }
+.form-status.is-ok { color: var(--add); }
+.form-foot { font-size: var(--fs-sm); color: #8f98a6; }
+
+/* ---------- 编辑码面板 ---------- */
+.token-panel {
+  margin-top: 18px;
+  padding: 16px 14px;
+  border-radius: var(--radius-in);
+  background: rgba(78, 201, 176, .10);
+  border: 1px solid rgba(78, 201, 176, .38);
+}
+.token-panel h3 { font-size: var(--fs-h3); color: #fff; margin-bottom: 8px; }
+.token-note { color: #dfe4ea; font-size: var(--fs-sm); margin-bottom: 12px; }
+.token-note strong { color: #fff; font-weight: 620; }
+.token-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius-in);
+  background: rgba(0, 0, 0, .34);
+  border: 1px solid rgba(255, 255, 255, .16);
+}
+.token-box code {
+  flex: 1 1 12ch;
+  min-width: 0;
+  font-family: var(--font-code);
+  font-size: var(--fs-sm);
+  color: #fff;
+  word-break: break-all;
+}
+.token-warn { margin-top: 10px; font-size: var(--fs-sm); color: #f0b8ad; }
+
+/* ============================================================
+   加群 + 友链 + 页脚
+   ============================================================ */
+.join-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+@media (min-width: 640px) {
+  .join-grid { grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: start; }
+}
+.qr { display: grid; place-items: center; }
+.qr img {
+  width: 190px;
+  height: 190px;
+  border-radius: var(--radius-in);
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: #fff;
+  padding: 8px;
+}
+.join-info p { color: #cfd4dc; font-size: var(--fs-sm); margin-bottom: 10px; }
+.join-info p:last-child { margin-bottom: 0; }
+.join-info .warn {
+  padding: 10px 12px;
+  border-radius: var(--radius-in);
+  background: rgba(244, 135, 113, .10);
+  border: 1px solid rgba(244, 135, 113, .32);
+  color: #f0c0b5;
+}
+.join-info .warn strong { color: #fff; font-weight: 620; }
+
+.links-block { border-top: 1px solid rgba(255, 255, 255, .10); padding-top: 18px; }
+.link-list { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .link-list { grid-template-columns: 1fr 1fr; } }
+.link-card {
+  display: block;
+  padding: 12px 14px;
+  border-radius: var(--radius-in);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .10);
+  color: #e8e8e8;
+  text-decoration: none;
+}
+.link-card:hover { background: rgba(255, 255, 255, .09); }
+
+/* ---------- 友情链接卡片（app.js 动态生成） ----------
+   折叠态：名字 + 打开按钮；展开态：描述滑出来。
+   展开完全由 .open 控制（app.js 切类），不用行内样式。 */
+.link-card {
+  display: block;
+  padding: 14px 16px;
+  border-radius: var(--radius-in);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .10);
+  color: #e8e8e8;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link-card:hover { border-color: rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); }
+.link-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.link-card .name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 620;
+  color: #fff;
+}
+.link-card .chev {
+  font-family: var(--font-code);
+  color: #9aa3b0;
+  transition: transform var(--d-morph, 320ms) var(--ease-out);
+}
+.link-card.open .chev { transform: rotate(90deg); }
+.link-card .desc {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-top: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: #9aa3b0;
+}
+.link-card.open .desc {
+  max-height: 260px;
+  opacity: 1;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+}
+.link-card .open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;              /* 触控目标下限 */
+  margin-top: 12px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  background: rgba(255, 255, 255, .06);
+  color: #e8e8e8;
+  font-family: var(--font-code);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link-card .open-btn:hover { background: rgba(255, 255, 255, .14); }
+
+/* link-btn 的次级变体（「不是这次」之类的次要动作） */
+.link-btn.subtle {
+  border-color: rgba(255, 255, 255, .14);
+  background: transparent;
+  color: #b0b8c4;
+}
+.link-btn.subtle:hover { background: rgba(255, 255, 255, .07); }
+
+.foot {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, .10);
+  font-size: var(--fs-label);
+  color: #7d8694;
+  text-align: center;
+}
+
+/* ============================================================
+   入场：列表项错峰淡入 + 标题擦入
+
+   .reveal 的初始态必须是「可见但透明」，不能用 display/visibility 隐藏 ——
+   万一 JS 没跑起来，内容不能是隐形的。app.js 在没有 IntersectionObserver
+   时会直接加 .visible。
+   ============================================================ */
+/* ⚠ 隐藏这件事挂在 html.js 上，不能无条件写。
+   html.js 是 app.js 第一行加的，所以脚本正常跑起来才进入「初始隐藏」状态；
+   万一 JS 加载失败或被禁用，内容必须是**可见**的 ——
+   否则整个页面会是一片空白，而且没有任何报错线索。
+   （旧版是 .reveal 无条件 opacity:0，属于同类隐患，顺手修掉。） */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--d-reveal) var(--ease-out), transform var(--d-reveal) var(--ease-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger));
+}
+.js .reveal.visible { opacity: 1; transform: none; }
+
+.js .hero, .js .sec { opacity: 0; transition: opacity 420ms var(--ease-out); }
+.js .hero.visible, .js .sec.visible { opacity: 1; }
+
+@keyframes type-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes caret-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .js .reveal { opacity: 1; transform: none; }
+  .js .hero, .js .sec { opacity: 1; }
+  .tl-item.tl-active::after { animation: none; }
+}
+
+/* 打印 / 极端降级：不显示代码带 */
+@media print {
+  body::before { display: none; }
+  body { background: #fff; color: #000; }
+}
+
+/* 屏幕阅读器等：视觉隐藏但保留给辅助技术 */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   页面底部留白：让最后一张卡片和视口底边之间有点空间
+   ============================================================ */
+.page { padding-bottom: 72px; }
+
+</style>
+<style data-source="public/codefield.css">
+/* ============================================================
+   代码场域 —— 页面上侧的一条代码带
+   z-index 0，内容面板盖在它下缘的渐隐区上。代码带保持 alpha 1.0 全饱和：
+   压暗会让语法颜色消失，代码就退化成灰噪声（见计划 §1 的 alpha 实测）。
+
+   语法色取自 VSCode Dark+ 原生值，压在 #1f1f1f 上全部 ≥4.5:1，
+   所以不需要为了对比度调色 —— 这是「原生 VSCode」能成立的前提。
+   ============================================================ */
+
+/* ⚠ 高度必须定义在 :root 上，不能只写在 .cf 里。
+   .cf 和页面内容是**兄弟**关系，自定义属性不跨兄弟继承 ——
+   写在 .cf 上时，.hero 里的 var(--cf-h, 340px) 会一直取那个兜底值 340px，
+   于是面板位置在窄屏上悄悄错了（实测 320px 下偏了 44px）。
+   :root 上定义一次，两边都读得到。 */
+:root {
+  /* 代码带高度：页面上侧的一小部分，剩下的页面是纯黑。
+     46vh 是有意的：玻璃卡片压在上面时，卡片下方还能露出一段没被遮的原始代码。 */
+  --cf-h: clamp(300px, 46vh, 460px);
+  /* 渐隐起点：从这个高度开始，代码和底一起淡向透明（＝露出下面的纯黑） */
+  --cf-fade: 46%;
+}
+/* 矮屏（横屏手机）：带子再压一点，别把内容都挤下去 */
+@media (max-height: 560px) {
+  :root { --cf-h: clamp(220px, 54vh, 320px); --cf-fade: 48%; }
+}
+
+.cf {
+  /* 字体：全部系统字体，零下载。等宽字是代码辨识度的必要条件，
+     语法颜色才是充分条件。 */
+  --cf-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+             "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --cf-fs: clamp(11px, 3.05vw, 12.5px);
+  --cf-lh: 1.62;
+  --cf-gut: 46px;            /* 行号栏宽度 */
+  --cf-top: 30px;            /* 顶部面包屑留白 */
+
+  /* fixed：内容从页面顶部开始、在带子上方滑过去。
+     这样每一张玻璃卡片往下滚的时候背后都有活的代码，
+     而不是只有第一屏能看到。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--cf-h);
+  z-index: 1;
+  overflow: hidden;
+  /* 底色透明，让下面的氛围层透上来 ——
+     这样整条带子都有色调起伏，玻璃卡片到处都有东西可透，
+     而不是只有代码那 360px 宽的范围里有。
+     顺带：代码的对比度按纯黑算反而更高（原来按 #1f1f1f 算的）。 */
+  background: transparent;
+  color: var(--ed-fg, #cccccc);
+  font-family: var(--cf-font);
+  font-size: var(--cf-fs);
+  line-height: var(--cf-lh);
+  font-variant-ligatures: none;       /* 连字会让逐字宽度不可预测，也会把 -> 变成箭头 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 底部渐隐到纯黑。
+     遮罩盖的是整个代码带（连底色一起），所以下面不是「被切一刀」，
+     而是代码和背景一起溶进页面的纯黑里。 */
+  -webkit-mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+  mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+
+  /* 提升为独立合成层：代码带每 tick 只重绘自己，不牵动整页 */
+  transform: translateZ(0);
+  contain: layout paint style;
+  user-select: none;
+  pointer-events: none;               /* 装饰层，绝不抢点击 */
+}
+
+@media (min-width: 900px) { .cf { --cf-fs: 13.5px; --cf-gut: 54px; } }
+/* 手机上把行号栏收窄，多出约 16px 给代码 */
+@media (max-width: 899px) { .cf { --cf-gut: 30px; } }
+
+/* ---------- 顶部面包屑：告诉你现在看的是哪个文件 ---------- */
+.cf-meta {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: var(--cf-top);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 0.84em;
+  color: var(--syn-ln, #8a9199);
+  opacity: .72;
+}
+.cf-file { color: var(--syn-fn, #dcdcaa); }
+.cf-lang { color: var(--syn-ln, #8a9199); }
+.cf-meta::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: .16;
+}
+
+/* ---------- 主体 ---------- */
+.cf-body { position: absolute; left: 0; right: 0; }
+
+/* 所有档共用：可滚动区只占代码带的上部，底边留给渐隐区。
+   正在打字/正在输出的那一行必须待在完全清晰的位置，
+   不能已经落进渐隐里 —— 否则最新的内容反而最看不清。 */
+.cf-body { bottom: 36%; }
+
+/* 编辑器档：顶对齐，内容往下长，超出后由 JS 设 scrollTop 跟随光标。
+   overflow:hidden 而不是 clip —— clip 会禁止程序滚动。
+   注意：之前这里用 transform: translateY(--cf-shift) 做跟随，
+   但 CSP 的 style-src 会拦内联样式属性；scrollTop 不碰样式，更省心。 */
+.cf-body.is-editor {
+  top: var(--cf-top);
+  overflow: hidden;
+}
+
+/* 终端 / 依赖日志：顶对齐往下长，超出后往上滚（followBottom）。
+   之前这里是 justify-content: flex-end 做底对齐，
+   后果是第一行出现在带子底部然后往上长 —— 就是「从下往上」的观感。 */
+.cf-body.is-terminal,
+.cf-body.is-install {
+  top: var(--cf-top);
+  overflow: hidden;
+  display: block;
+}
+
+/* ---------- 编辑器行 ---------- */
+.cf-body.is-editor { counter-reset: ln; }
+
+.cf-line {
+  position: relative;
+  padding-left: var(--cf-gut);
+  padding-right: 16px;
+  min-height: calc(1em * var(--cf-lh));
+  white-space: pre;
+}
+.cf-line::before {
+  counter-increment: ln;
+  content: counter(ln);
+  position: absolute;
+  left: 0;
+  width: calc(var(--cf-gut) - 14px);
+  text-align: right;
+  color: var(--syn-ln, #8a9199);
+  opacity: 0;
+}
+/* 行号跟着打字一起出现；没打到的行不留行号，避免「空的文档却有 20 行号」 */
+.cf-line.is-started::before { opacity: 1; }
+
+/* 当前行高亮 —— 编辑器的原生行为 */
+.cf-line.is-cur { background: rgba(255,255,255,.035); }
+
+/* 光标：竖条，放在当前 token 的尾部（不能放行尾，因为后面的 token 只是透明了） */
+.cf-t.is-cur::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.06em;
+  margin-right: -2px;
+  vertical-align: -0.16em;
+  background: var(--syn-caret, #aeafad);
+  animation: cf-blink 1.06s steps(1, end) infinite;
+}
+@keyframes cf-blink { 0%, 55% { opacity: 1 } 56%, 100% { opacity: 0 } }
+
+/* 未打到的 token：文本已经在 DOM 里占好位置（所以打字过程中零位移），只是不显示 */
+.cf-t.is-hid { opacity: 0; }
+
+/* 打错：红色波浪下划线，和 VSCode 的报错提示同款。
+   意义不只是好看 —— 它让「打错了」这件事在屏幕上是看得见的，
+   否则观众只会看到字符莫名其妙变少，读不出「作者改了个错」。 */
+.cf-t.is-typo {
+  color: var(--ed-del, #f48771);
+  text-decoration: underline wavy var(--ed-del, #f48771);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* 选中全部（换档时的「全选删除」）—— VSCode 选区蓝
+   注意选择器是 .cf-body.is-selecting：类加在 .cf-body 上，不是 .cf 上。 */
+.cf-body.is-selecting .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* 整行重写：这一行被全选，同样用选区蓝。
+   和「全选删除」是同一个视觉语言 —— 都是「选起来准备动它」。 */
+.cf-line.is-selected .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* ---------- 暂停徽标 ----------
+   用户一开始填表，代码带就停下并挂上这个标记。
+   为什么要显示：动画突然不动会被当成卡死，说清楚「是我故意停的」才不会误解。
+
+   暂停图标用两段 CSS 画的竖条，不用 ⏸ 这类字符 ——
+   它们大多落在 U+23xx 符号区，等宽字体的覆盖很不稳（可能变成豆腐块）。 */
+.cf-hold {
+  /* fixed 到视口：卡片盖住代码带时也能看见（挂在 .cf 外面，见 HTML 注释） */
+  position: fixed;
+  z-index: 4;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, .20);
+  border-radius: 999px;
+  /* ⚠ 徽标自己也是一块玻璃，但它必须比卡片厚得多。
+     徽标是浮在代码带最亮那一段上的（带子顶部），背后常有高亮 token；
+     沿用卡片的淡 tint 时，实测文字对比度只有 3.23:1（320px）。
+     小控件没有余地，所以这里 .90 不透明 + brightness(.7) 压暗背后。
+     卡片可以很透，因为卡片里的文字下方有留白；徽标没有。 */
+  background: rgba(8, 9, 13, .90);
+  -webkit-backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  color: #e8e8e8;
+  font-family: var(--cf-font);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.cf-hold[hidden] { display: none; }
+/* 只在 paused-reduced 之外真正显示；:not([hidden]) 已经挡了，这里再给个渐入 */
+.cf-hold:not([hidden]) { opacity: 1; }
+
+.cf-hold-bars {
+  position: relative;
+  width: 8px;
+  height: 10px;
+  flex: none;
+}
+.cf-hold-bars::before,
+.cf-hold-bars::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 10px;
+  background: currentColor;
+}
+.cf-hold-bars::before { left: 0 }
+.cf-hold-bars::after  { right: 0 }
+
+/* ---------- 终端 / 日志行 ---------- */
+.cf-tline { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cf-body.is-install .cf-tline { padding-left: var(--cf-gut); }
+
+/* ---------- 语法着色（VSCode Dark+ 原生值） ---------- */
+.k-kw { color: var(--syn-kw, #569cd6) }   /* 声明关键字 5.59:1 */
+.k-ct { color: var(--syn-ct, #c586c0) }   /* 控制流     5.92:1 */
+.k-ty { color: var(--syn-ty, #4ec9b0) }   /* 类型       8.09:1 */
+.k-fn { color: var(--syn-fn, #dcdcaa) }   /* 函数       11.66:1 */
+.k-va { color: var(--syn-va, #9cdcfe) }   /* 变量       11.05:1 */
+.k-st { color: var(--syn-st, #ce9178) }   /* 字符串     6.24:1 */
+.k-nu { color: var(--syn-nu, #b5cea8) }   /* 数字       9.70:1 */
+.k-cm { color: var(--syn-cm, #6a9955) }   /* 注释       4.95:1 */
+.k-an { color: var(--syn-an, #dcdcaa) }   /* 注解      11.66:1 */
+.k-pp { color: var(--syn-pp, #569cd6) }   /* 预处理     5.59:1 */
+.k-op { color: var(--syn-op, #d4d4d4) }
+.k-ws { color: inherit }
+
+/* ---------- 终端语义色 ---------- */
+.t-box  { color: var(--syn-ln, #8a9199) }
+.t-cmd  { color: var(--ed-fg, #cccccc) }
+.t-user { color: var(--syn-va, #9cdcfe) }
+.t-say  { color: var(--ed-fg, #cccccc) }
+.t-say::first-letter { color: var(--ed-accent, #4da3e8) }   /* ⏺ */
+.t-note { color: var(--syn-ln, #8a9199) }
+.t-code { color: var(--syn-va, #9cdcfe) }
+.t-add  { color: var(--ed-add, #4ec9b0); background: rgba(78,201,176,.10) }
+.t-del  { color: var(--ed-del, #f48771); background: rgba(244,135,113,.10) }
+.t-think { color: var(--syn-fn, #dcdcaa) }
+.t-log  { color: var(--syn-ln, #8a9199) }
+.t-build { color: var(--syn-ty, #4ec9b0) }
+.t-plain { color: var(--ed-fg, #cccccc) }
+
+/* ---------- 依赖下载的进度条 ----------
+   固定总宽度：填充在长、剩余在短，两者之和恒定，
+   所以右边的标签不会随着进度左右跳动。 */
+.t-bar { white-space: pre; }
+.bar-on  { color: var(--ed-accent, #4da3e8) }
+.bar-off { color: var(--syn-ln, #8a9199); opacity: .3 }
+.bar-lab { color: var(--syn-ln, #8a9199) }
+
+/* 减少动效：一切静止 */
+@media (prefers-reduced-motion: reduce) {
+  .cf-t.is-cur::after { animation: none }
+  .cf-body.is-editor { transition: none }
+}
+
+/* 打印 / 极端降级：不显示代码层 */
+@media print { .cf { display: none } }
+
+/* ============================================================
+   静态对照表用：同一套渲染，但参与文档流（不是固定全屏层）
+   —— 对照表里看到的必须和解效时看到的是同一套东西，
+      否则对照表就是自欺。所以复用的是同一个 paintStatic()。
+   ============================================================ */
+.cf.cf-sheet {
+  position: static;
+  inset: auto;
+  height: auto;
+  contain: none;
+  transform: none;
+  overflow: visible;
+  pointer-events: auto;
+  border: 1px solid var(--ed-border, #2b2b2b);
+  background: var(--ed-bg, #1f1f1f);
+}
+.cf.cf-sheet .cf-meta { position: static; height: auto; padding: 7px 12px; }
+.cf.cf-sheet .cf-body { position: static; transform: none; transition: none; overflow: visible; max-height: none; }
+.cf.cf-sheet .cf-body.is-terminal,
+.cf.cf-sheet .cf-body.is-install { display: block; }
+.cf.cf-sheet .cf-line::before { opacity: 1; }
+
+</style>
+<style data-source="draft-static-fixes">
+
+/* ---- draft static fixes (非设计变更：静态稿没有 JS) ---- */
+[hidden] { display: none !important; }
+.js .reveal { opacity: 1 !important; transform: none !important; }
+
+</style>
+<style data-source="graphite.css">
+/* ============================================================
+   Graphite Console —— 材质覆盖层（设计稿）
+   叠在 style.css + themes/02-editor-dark.css 之后。
+
+   只改「材质」：颜色家族 / 透明度刻度 / 背景 / 代码带底板 / 精密感细节。
+   不改：布局、间距、字号、圆角、动效时长、DOM 结构、无障碍契约。
+
+   对应真实仓库的落地方式（二选一）：
+     (a) 把这套值写回 themes/*.css 的 --ed-* 契约，并把 style.css 里的
+         硬编码字面量换成 var() —— 干净，但要动 63 处；
+     (b) 保留本文件为覆盖层 —— 改动集中、可回滚。
+   ============================================================ */
+
+/* ---------- 1. 令牌：单一冷色相家族 + 有刻度的透明度 ---------- */
+:root {
+  /* 表面阶梯 */
+  --bg-0: #07090f;   /* 代码带底板 */
+  --bg-1: #0b0e15;   /* 页面底 */
+  --bg-2: #10141d;   /* 抬升面 */
+  --bg-3: #161b26;   /* 凹陷面：input / option / 内嵌块 */
+
+  /* 文字阶梯：9 个手挑灰 → 4 级 */
+  --fg-0: #f2f5fa;   /* 标题        17.66:1 */
+  --fg-1: #cbd2dd;   /* 正文        12.69:1 */
+  --fg-2: #939cab;   /* 次要/说明     6.97:1 */
+  --fg-3: #6b7484;   /* 占位/极弱     4.10:1（仅大字/装饰） */
+
+  /* 发丝线三档 */
+  --line-soft:   rgba(255, 255, 255, .07);
+  --line:        rgba(255, 255, 255, .12);
+  --line-strong: rgba(255, 255, 255, .22);
+
+  /* 表面 tint 四档（替掉原来 18 档随手 alpha） */
+  --tint-1: rgba(10, 13, 20, .12);   /* 文档面 / 列表项（比卡片更淡） */
+  --tint-2: rgba(8, 11, 18, .14);    /* 玻璃卡：够透 —— 背后跑的代码必须看得见 */
+  --tint-3: rgba(22, 27, 38, .55);   /* 输入框 / 内嵌 */
+  --tint-4: rgba(7, 9, 15, .62);     /* 顶栏 / 徽标 */
+  --pill:   rgba(255, 255, 255, .06);
+
+  /* 模糊两档。saturate 170% 是「糊成泥」的元凶；但 brightness 压太狠同样会
+     把代码带糊没 —— 卡片是「看代码的窗口」，不是一块遮光板。 */
+  --blur-sm: blur(14px) saturate(120%);
+  --blur-lg: blur(12px) saturate(150%) brightness(.96);   /* 12px：模糊必须小于它要透出的结构尺度 */
+
+  --shadow-card: 0 24px 60px -20px rgba(0, 0, 0, .85), inset 0 1px 0 rgba(255, 255, 255, .30);
+  --tick: var(--line);   /* 准星角标颜色 */
+}
+
+/* 让「死」了的核心令牌真正生效（--bg/--bg-2/--guide/--fg/--fg-2/--gutter 原本 0 次消费） */
+html[data-theme="editor-dark"] {
+  --ed-bg: var(--bg-1);
+  --ed-bg-2: var(--bg-2);
+  --ed-guide: var(--bg-3);
+  --ed-fg: var(--fg-1);
+  --ed-fg-2: var(--fg-2);
+  --ed-gutter: var(--fg-3);
+}
+
+/* ---------- 2. 底色：单色冷渐变，删掉 4 个彩色斑 ---------- */
+html { background: var(--bg-0); }
+body {
+  background-color: var(--bg-1);
+  background-image: linear-gradient(180deg, var(--bg-1) 0%, #090c12 55%, var(--bg-0) 100%);
+  background-repeat: no-repeat;
+  color: var(--fg-1);
+}
+
+/* 氛围层：一处冷光 + 24px 发丝网格（网格给模糊「边缘」，纯渐变被糊完还是纯渐变） */
+body::before {
+  background:
+    /* 代码带的光溢：卡片后面「有东西可透」的主来源（冷色，来自语法高亮的蓝） */
+    radial-gradient(72% 48% at 14% 2%, rgba(77, 163, 232, .22), transparent 68%),
+    /* 代码自身的补色（字符串橙），极淡 —— 只为了让光不平 */
+    radial-gradient(46% 30% at 40% 12%, rgba(206, 145, 120, .07), transparent 70%),
+    /* 纵向亮度坡：紧贴代码带下方最亮，往下衰减 —— 玻璃吃到的就是这束光 */
+    linear-gradient(180deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, 0) 44%),
+    /* 发丝网格：给模糊提供边缘（纯渐变被糊完还是纯渐变） */
+    repeating-linear-gradient(0deg,  rgba(255, 255, 255, .045) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .045) 0 1px, transparent 1px 24px);
+  background-size: auto, auto, auto, auto, auto;
+  -webkit-mask-image: radial-gradient(130% 95% at 50% 0%, #000 0 55%, transparent 100%);
+  mask-image: radial-gradient(130% 95% at 50% 0%, #000 0 55%, transparent 100%);
+}
+
+::selection { background: rgba(77, 163, 232, .28); color: var(--fg-0); }
+
+/* ---------- 3. 顶栏：一档模糊 + 发丝下边 ---------- */
+.top {
+  background: var(--tint-4);
+  border-bottom: 1px solid var(--line-soft);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  box-shadow: none;
+}
+.tab { background: var(--pill); box-shadow: inset 0 0 0 1px var(--line-soft); }
+.tab-name { color: var(--fg-0); }
+.tab-ext { color: var(--fg-2); }
+.nav a { color: var(--fg-2); }
+.nav a:hover, .nav a:focus-visible { color: var(--fg-0); }
+.top-cta { background: var(--accent); color: #04070d; border: 1px solid rgba(255, 255, 255, .14); }
+.top-cta:hover { filter: brightness(1.06); }
+.prog { background: var(--line-soft); }
+.prog i { background: var(--accent); }
+
+/* 状态点：把「读数」变成仪器读数，而不是一行灰字 */
+.top-status { color: var(--fg-2); }
+.top-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(77, 163, 232, .14);
+}
+
+/* ---------- 4. 玻璃卡：一档模糊 + 准星角标（四角 L 形，纯 CSS，零新增 DOM） ---------- */
+.shell, .hero-in {
+  background-color: var(--tint-2);
+  border: 1px solid var(--line-strong);   /* 填充越淡，边缘越要顶上来定义这张卡 */
+  box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
+  background-image:
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+  background-size: 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px;
+  background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+/* 斜向反光退场：改由 1px 上高光（已在 --shadow-card 里）定义玻璃边缘 */
+.shell::before, .hero-in::before { background: none; }
+
+/* ---------- 5. 文字阶梯收敛：9 个灰 → 4 级 ---------- */
+.h1, .h2, .h3, .tl-title, .notice h3, .token-panel h3,
+.link-card .name, .link-card .desc, .token-box code, .field > label { color: var(--fg-0); }
+body, .lede, .tl-desc, .notice-body, .dir-desc, .join-info p, .token-note, .field textarea, .field input, .field select { color: var(--fg-1); }
+.top-status, .nav a, .tab-ext, .dir-code, .dir-idx, .tl-when, .notice-meta, .pane-meta,
+.hint, .form-foot, .form-status, .link-card .chev, .link-card .open-btn, .captcha-img { color: var(--fg-2); }
+.opt, .field input::placeholder, .field textarea::placeholder { color: var(--fg-3); }
+.req { color: var(--del); }
+.form-status.is-ok { color: var(--add); }
+.form-status.is-err { color: var(--del); }
+
+/* 文字局部对比保护：玻璃透了之后，亮代码光斑会从文字底下穿过去。
+   不给文字加遮罩块（那会毁掉"透明卡"的感觉），改成一层大半径暗影 ——
+   只压住字形周围几像素的底，卡片该透还是透。 */
+.lede, .h1, .h2, .h3, .tl-title, .tl-desc, .tl-when, .dir-cn, .dir-desc, .dir-code,
+.hint, .notice h3, .notice-body, .notice-meta, .pane-name, .pane-meta, .field > label {
+  text-shadow: 0 1px 14px rgba(4, 6, 10, .60), 0 0 3px rgba(4, 6, 10, .45);
+}
+
+/* ---------- 6. 按钮 ---------- */
+.btn { background: var(--fg-0); color: var(--bg-0); box-shadow: inset 0 0 0 1px transparent; }
+.btn:hover { background: #fff; }
+.submit { background: var(--accent); color: #04070d; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+.submit:hover { filter: brightness(1.06); }
+.submit[disabled] { background: var(--bg-3); color: var(--fg-3); box-shadow: inset 0 0 0 1px var(--line-soft); }
+.link-btn { color: var(--accent); }
+.link-btn.subtle { color: var(--fg-2); }
+
+/* ---------- 7. 方向行 / 时间线 / 公告 ---------- */
+.dir-row {
+  background: transparent;
+  border-top: 1px solid var(--line-soft);
+  transition: background var(--d-tap) var(--ease-tap), border-color var(--d-tap) var(--ease-tap);
+}
+.dir-row:hover, .dir-row:focus-visible { background: var(--pill); --tick: var(--accent); }
+.dir-row[data-dir] .dir-code { color: var(--dir); }
+
+.tl-item::before { background: var(--line-soft); }                 /* 轨道 */
+.tl-item::after { background: var(--bg-2); border-color: var(--line); }   /* 节点 */
+.tl-item.tl-done::after { background: var(--accent); border-color: var(--accent); }
+.tl-item.tl-active::after { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(77, 163, 232, .16); }
+
+.notice { background: var(--tint-1); border-left-color: var(--line); }
+.notice.pinned { border-left-color: var(--accent); }
+.device-card, #device-card { background: var(--tint-1); border-left-color: var(--accent); }
+
+/* ---------- 8. 文档面 / 字段 / 提示条 ---------- */
+.pane { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.pane-bar { border-bottom: 1px solid var(--line-soft); }
+.pane-meter { background: var(--line-soft); }
+.pane-meter i { background: var(--accent); }
+
+.field input, .field select, .field textarea {
+  background: var(--tint-3);
+  border: 1px solid var(--line-soft);
+  color: var(--fg-1);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: rgba(77, 163, 232, .55);
+  box-shadow: 0 0 0 3px rgba(77, 163, 232, .16);
+  outline: none;
+}
+.field option { background: var(--bg-3); color: var(--fg-0); }
+.captcha-img { box-shadow: inset 0 0 0 1px var(--line-soft); border-radius: var(--radius-in); background: var(--bg-3); }
+
+.banner { background: var(--tint-1); border-left-color: var(--line); }
+.edit-banner { border-left-color: var(--accent); background: var(--tint-1); }
+
+.token-panel { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.token-box { background: var(--bg-3); border: 1px solid var(--line-soft); }
+.token-warn { color: var(--del); }
+
+/* ---------- 9. 加群 / 友链 / 页脚 ---------- */
+.qr img { box-shadow: inset 0 0 0 1px var(--line-soft); border-radius: var(--radius-in); }
+.join-info .warn { border-left: 1px solid var(--line); background: var(--tint-1); }
+.link-card { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.link-card:hover, .link-card.open { border-color: var(--line-strong); --tick: var(--accent); }
+.link-card .open-btn { box-shadow: inset 0 0 0 1px var(--line-soft); background: var(--pill); }
+.foot { color: var(--fg-3); border-top: 1px solid var(--line-soft); }
+
+/* ---------- 10. 代码带：拿到自己的底板（语法色从此有确定底色） ---------- */
+.cf {
+  /* 半透明底板：语法色仍有确定底色，但代码的"光"能透到玻璃卡后面 */
+  border-bottom: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  background-color: rgba(7, 9, 15, .62);
+  /* 关键：卡片有 1120px 宽，代码只占左侧约 360px。右半边背后原本什么都没有，
+     玻璃在那里就退化成一块灰膜。下面三层把「文档结构」横向铺满整条带子：
+       1) 行基线：每个代码行高一条 1px 发丝线，全宽 —— 玻璃糊过去就是"一页文档"
+       2) hunk 线：每 10 行一条微蓝线 —— 像 diff 的分块边界，给长距离节奏
+       3) 折叠线：代码列右侧一条纵向发丝线 —— 给模糊一条竖向边缘 */
+  background-image:
+    repeating-linear-gradient(180deg,
+      rgba(255, 255, 255, .05) 0 1px,
+      transparent 1px calc(var(--cf-fs) * var(--cf-lh))),
+    repeating-linear-gradient(180deg,
+      rgba(77, 163, 232, .10) 0 1px,
+      transparent 1px calc(var(--cf-fs) * var(--cf-lh) * 10));
+  background-position: 0 var(--cf-top), 0 var(--cf-top);
+  background-repeat: repeat, repeat;
+}
+.cf-meta { border-bottom: 1px solid var(--line-soft); color: var(--fg-3); }
+.cf-line::before { color: var(--fg-3); }            /* 行号栏 */
+.cf-line.is-cur { background: rgba(255, 255, 255, .03); }   /* 当前行：不用色块 */
+.cf-hold {
+  background: var(--tint-4);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  color: var(--fg-1);
+}
+
+/* ---------- 11. 降级：无 backdrop-filter ---------- */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell, .hero-in { background-color: #0f131b; }
+  .top, .cf-hold { background: var(--bg-0); }
+}
+
+
+/* ---------- 13. 玻璃后面「看得见结构」的三个大尺度手段 ----------
+   教训：backdrop-filter 会把小于模糊半径的结构彻底抹平。
+   1px 发丝线 / 24px 网格 / 2px 缩略图条 在 blur(20px) 后面等于不存在。
+   只有「成团的、和模糊半径同量级或更大」的东西才透得过来：
+     · 代码字形本身（行高 22px 的文字团）
+     · 整行高亮（编辑器的原生行为，而且它会跟着打字往下走 → 玻璃后面有"活"的移动）
+     · 行带（每行一条全宽底色带 = 一页文档的横向层次）                                    */
+
+/* (1) 代码行铺满整条带子：让"当前行高亮"成为全宽色带，而不是只有左边一小截 */
+.cf-body.is-editor .cf-line { width: 100%; }
+
+/* (2) 行带：偶数行 2.2% 白，当前行 7% —— 22px 一条，正好扛得住 blur(12px) */
+.cf-body.is-editor .cf-line:nth-child(even) { background: rgba(255, 255, 255, .022); }
+.cf-body.is-editor .cf-line.is-cur { background: rgba(255, 255, 255, .07); }
+/* 当前行左侧再加一段强调：模糊之后是一团明确的光斑，跟着光标往下走 */
+.cf-body.is-editor .cf-line.is-cur::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 220px;
+  background: linear-gradient(90deg, rgba(77, 163, 232, .16), transparent 100%);
+  pointer-events: none;
+}
+.cf-body.is-editor .cf-line { position: relative; }
+
+/* (3) 缩略图：条加粗到 4px（< 模糊半径的元素会被抹掉，4px 在 blur(12px) 下仍留痕） */
+.cf-mini { gap: 3px; }
+.cf-mini i { height: 4px; background: rgba(255, 255, 255, .26); }
+.cf-mini i.is-key { background: rgba(255, 255, 255, .38); }
+
+
+/* ---------- 14. 桌面端双栏分屏：让代码的发光体量铺满卡片宽度 ----------
+   实测：单栏时字形右缘 x=363，卡片 160→1280 —— 代码只覆盖卡片宽度的 18.1%，
+   其余 82% 的玻璃背后是空的，玻璃在那儿只能是块灰膜。
+   分屏后两栏分别覆盖 ~0→524 与 ~720→1244，覆盖卡片宽度约 79%。
+   .cf-meta / .cf-body 本来就是 position:absolute，所以每个 pane 只要做定位上下文即可，
+   不必改引擎的样式。 */
+.cf-panes { position: absolute; inset: 0; }
+.cf-pane { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.cf-pane:nth-child(1) { left: 0; }
+.cf-pane:nth-child(2) { left: 50%; border-left: 1px solid var(--line-soft); }
+
+/* 窄屏回到单栏（手机上代码带本来就被裁，分屏只会两边都看不清） */
+@media (max-width: 1099px) {
+  .cf-pane { width: 100% !important; }
+  .cf-pane:nth-child(2) { display: none; }
+}
+
+</style>
+<style data-source="graphite-nebula.css (B)">
+/* ============================================================
+   Graphite Nebula —— 变体 B（叠在 graphite.css 之后）
+
+   与 A 的差别只有一处主张：**允许氛围存在，但只允许一个色相家族**
+   （冷蓝 → 青），外加一层极淡扫描线。A 是「仪器面板」，B 是「冷光下的仪器面板」。
+   风险更高、个性更强；如果你要的是"稳、专业、不花"，选 A。
+   ============================================================ */
+
+body::before {
+  background:
+    /* 扫描线：3px 一根，几乎不可见，只在深色区提供一点"屏幕"质感 */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .014) 0 1px, transparent 1px 3px),
+    /* 唯一主色相：冷蓝，压在右上 */
+    radial-gradient(120% 75% at 82% -12%, rgba(77, 163, 232, .20), transparent 62%),
+    /* 同家族的青，只做补色，不再引入第三个色相 */
+    radial-gradient(95% 65% at -5% 28%, rgba(78, 201, 176, .11), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 24px);
+  background-size: auto, auto, auto, auto;
+  -webkit-mask-image: radial-gradient(140% 100% at 50% 0%, #000 0 60%, transparent 100%);
+  mask-image: radial-gradient(140% 100% at 50% 0%, #000 0 60%, transparent 100%);
+}
+
+/* 玻璃：tint 略深，边缘带一点冷色（rim light），仍由发丝线定义面 */
+.shell, .hero-in {
+  background-color: rgba(18, 23, 34, .34);
+  border-color: rgba(77, 163, 232, .20);
+}
+
+/* 代码带下沿一条冷光 + 顶栏一条冷线：把"屏幕"的边界点亮，而不点亮整块面 */
+.cf { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 0 rgba(77, 163, 232, .18); }
+.top { box-shadow: 0 1px 0 rgba(77, 163, 232, .14); }
+
+/* 状态点 + 进度线：变体 B 允许一点发光（仍在同一色相内） */
+.top-status::before { box-shadow: 0 0 0 3px rgba(77, 163, 232, .18), 0 0 12px rgba(77, 163, 232, .45); }
+.prog i { box-shadow: 0 0 10px rgba(77, 163, 232, .5); }
+
+</style>
+</head>
+<body>
+<div>
+<div class="cf" id="cf-root" data-mode="editor" aria-hidden="true" data-dir="软件"><div class="cf-panes"><div class="cf-pane"><div class="cf-meta">
+      <span class="cf-file">AuthController.java</span>
+      <span class="cf-lang">java</span>
+    </div><div class="cf-body is-editor"><div class="cf-line is-started"><span class="cf-t k-kw">package</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">lab</span><span class="cf-t k-op">.</span><span class="cf-t k-va">recruit</span><span class="cf-t k-op">.</span><span class="cf-t k-va">auth</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-kw">import</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">org</span><span class="cf-t k-op">.</span><span class="cf-t k-va">springframework</span><span class="cf-t k-op">.</span><span class="cf-t k-va">http</span><span class="cf-t k-op">.*;</span></div><div class="cf-line is-started"><span class="cf-t k-kw">import</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">org</span><span class="cf-t k-op">.</span><span class="cf-t k-va">springframework</span><span class="cf-t k-op">.</span><span class="cf-t k-va">web</span><span class="cf-t k-op">.</span><span class="cf-t k-va">bind</span><span class="cf-t k-op">.*;</span></div><div class="cf-line is-started"><span class="cf-t k-kw">import</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">jakarta</span><span class="cf-t k-op">.</span><span class="cf-t k-va">validation</span><span class="cf-t k-op">.</span><span class="cf-t k-ty">Valid</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-cm">// 密码比对交给编码器，别自己写 ==</span></div><div class="cf-line is-started"><span class="cf-t k-an">@RestController</span></div><div class="cf-line is-started"><span class="cf-t k-an">@RequestMapping</span><span class="cf-t k-op">(</span><span class="cf-t k-st">"/api/auth"</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-kw">public</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">class</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">AuthController</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">private</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">final</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">TokenService</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">tokens</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">private</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">final</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">UserRepository</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">users</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">public</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">AuthController</span><span class="cf-t k-op">(</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ty">TokenService</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">t</span><span class="cf-t k-op">,</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ty">UserRepository</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">u</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-kw">this</span><span class="cf-t k-op">.</span><span class="cf-t k-va">tokens</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">=</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">t</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-kw">this</span><span class="cf-t k-op">.</span><span class="cf-t k-va">users</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">=</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">u</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-an">@PostMapping</span><span class="cf-t k-op">(</span><span class="cf-t k-st">"/login"</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">public</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">ResponseEntity</span><span class="cf-t k-op">&lt;</span><span class="cf-t k-ty">Token</span><span class="cf-t k-op">&gt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">login</span><span class="cf-t k-op">(</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-an">@Valid</span><span class="cf-t k-ws"> </span><span class="cf-t k-an">@RequestBody</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">Form</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">f</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">users</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">findByStudentId</span><span class="cf-t k-op">(</span><span class="cf-t k-va">f</span><span class="cf-t k-op">.</span><span class="cf-t k-fn">id</span><span class="cf-t k-op">())</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">filter</span><span class="cf-t k-op">(</span><span class="cf-t k-va">u</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-&gt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">ok</span><span class="cf-t k-op">(</span><span class="cf-t k-va">u</span><span class="cf-t k-op">,</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">f</span><span class="cf-t k-op">))</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">map</span><span class="cf-t k-op">(</span><span class="cf-t k-va">tokens</span><span class="cf-t k-op">::</span><span class="cf-t k-va">issue</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">map</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">ResponseEntity</span><span class="cf-t k-op">::</span><span class="cf-t k-va">ok</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">orElseGet</span><span class="cf-t k-op">(</span><span class="cf-t k-kw">this</span><span class="cf-t k-op">::</span><span class="cf-t k-va">no</span><span class="cf-t k-op">);</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">private</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">boolean</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">ok</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">User</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">u</span><span class="cf-t k-op">,</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">Form</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">f</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-va">u</span><span class="cf-t k-op">.</span><span class="cf-t k-fn">locked</span><span class="cf-t k-op">())</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-va">log</span><span class="cf-t k-op">.</span><span class="cf-t k-fn">warn</span><span class="cf-t k-op">(</span><span class="cf-t k-st">"locked"</span><span class="cf-t k-op">);</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">false</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">encoder</span><span class="cf-t k-op">()</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">matches</span><span class="cf-t k-op">(</span><span class="cf-t k-va">f</span><span class="cf-t k-op">.</span><span class="cf-t k-fn">pw</span><span class="cf-t k-op">(),</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">u</span><span class="cf-t k-op">.</span><span class="cf-t k-fn">hash</span><span class="cf-t k-op">());</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-kw">private</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">ResponseEntity</span><span class="cf-t k-op">&lt;</span><span class="cf-t k-ty">Token</span><span class="cf-t k-op">&gt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">no</span><span class="cf-t k-op">()</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">ResponseEntity</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">status</span><span class="cf-t k-op">(</span><span class="cf-t k-nu">401</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-op">.</span><span class="cf-t k-fn">build</span><span class="cf-t k-op">();</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-op">}</span></div></div></div><div class="cf-pane"><div class="cf-meta">
+      <span class="cf-file">fw_load.c</span>
+      <span class="cf-lang">c</span>
+    </div><div class="cf-body is-editor"><div class="cf-line is-started"><span class="cf-t k-pp">#include</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&lt;</span><span class="cf-t k-va">stdint</span><span class="cf-t k-op">.</span><span class="cf-t k-va">h</span><span class="cf-t k-op">&gt;</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#include</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&lt;</span><span class="cf-t k-va">string</span><span class="cf-t k-op">.</span><span class="cf-t k-va">h</span><span class="cf-t k-op">&gt;</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#include</span><span class="cf-t k-ws"> </span><span class="cf-t k-st">"flash.h"</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-cm">/* 寄存器基址，手册 7.3 节 */</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">PERIPH_BASE</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0x40000000u</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">FLASH_SR</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-ty">PERIPH_BASE</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">+</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0x10u</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">FLASH_CR</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-ty">PERIPH_BASE</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">+</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0x14u</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">R</span><span class="cf-t k-op">(</span><span class="cf-t k-va">o</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(*(</span><span class="cf-t k-kw">volatile</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">uint32_t</span><span class="cf-t k-op">*)</span><span class="cf-t k-va">o</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">BSY</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-nu">1u</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&lt;&lt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-pp">#define</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">PG</span><span class="cf-t k-ws">  </span><span class="cf-t k-op">(</span><span class="cf-t k-nu">1u</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&lt;&lt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">3</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-kw">static</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">int</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">wait_ready</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">uint32_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">ticks</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ty">uint32_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">t</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">while</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-ty">R</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">FLASH_SR</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&amp;</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">BSY</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(++</span><span class="cf-t k-va">t</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&gt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">ticks</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">ETIMEDOUT</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-kw">__NOP</span><span class="cf-t k-op">();</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-op">}</span></div><div class="cf-line is-started"></div><div class="cf-line is-started"><span class="cf-t k-cm">/* len 是外面传进来的，先夹住再搬 */</span></div><div class="cf-line is-started"><span class="cf-t k-kw">int</span><span class="cf-t k-ws"> </span><span class="cf-t k-fn">fw_load</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">uint8_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">*</span><span class="cf-t k-va">dst</span><span class="cf-t k-op">,</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-kw">const</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">uint8_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">*</span><span class="cf-t k-va">src</span><span class="cf-t k-op">,</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-ty">size_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">len</span><span class="cf-t k-op">,</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">size_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">cap</span><span class="cf-t k-op">)</span></div><div class="cf-line is-started"><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-va">dst</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">==</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">NULL</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">||</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">src</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">==</span><span class="cf-t k-ws"> </span><span class="cf-t k-kw">NULL</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">EINVAL</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-va">len</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">==</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0u</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">||</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">len</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&gt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">cap</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">EINVAL</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-va">len</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">%</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">4u</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">!=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0u</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">EINVAL</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-fn">wait_ready</span><span class="cf-t k-op">(</span><span class="cf-t k-nu">1000u</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">!=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">EBUSY</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ty">R</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">FLASH_CR</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">|=</span><span class="cf-t k-ws"> </span><span class="cf-t k-ty">PG</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ty">size_t</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">i</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">for</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-va">i</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">;</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">i</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&lt;</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">len</span><span class="cf-t k-op">;</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">i</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">+=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">4u</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-fn">memcpy</span><span class="cf-t k-op">(</span><span class="cf-t k-va">dst</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">+</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">i</span><span class="cf-t k-op">,</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">src</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">+</span><span class="cf-t k-ws"> </span><span class="cf-t k-va">i</span><span class="cf-t k-op">,</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">4u</span><span class="cf-t k-op">);</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-ct">if</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-fn">wait_ready</span><span class="cf-t k-op">(</span><span class="cf-t k-nu">50u</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">!=</span><span class="cf-t k-ws"> </span><span class="cf-t k-nu">0</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">{</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-ty">R</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">FLASH_CR</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&amp;=</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">~</span><span class="cf-t k-ty">PG</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">            </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">-</span><span class="cf-t k-ty">EBUSY</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">        </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-op">}</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ty">R</span><span class="cf-t k-op">(</span><span class="cf-t k-ty">FLASH_CR</span><span class="cf-t k-op">)</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">&amp;=</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">~</span><span class="cf-t k-ty">PG</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-ws">    </span><span class="cf-t k-ct">return</span><span class="cf-t k-ws"> </span><span class="cf-t k-op">(</span><span class="cf-t k-kw">int</span><span class="cf-t k-op">)</span><span class="cf-t k-va">len</span><span class="cf-t k-op">;</span></div><div class="cf-line is-started"><span class="cf-t k-op">}</span></div></div></div></div></div>
+<span class="cf-hold" hidden="">
+    <i class="cf-hold-bars" aria-hidden="true"></i>
+    <span class="cf-hold-text">已暂停</span>
+  </span>
+<header class="top">
+    <div class="top-in">
+      <a class="tab" href="#hero" id="link-01-网络攻防与信息安全-md">
+        <span class="tab-name">网络攻防与信息安全</span><span class="tab-ext">.md</span>
+      </a>
+      <span class="top-status" id="phase-text">预热中</span>
+      <nav class="nav" aria-label="页内导航">
+        <a href="#directions" aria-current="true" id="link-02-方向">方向</a>
+        <a href="#flow" id="link-03-流程">流程</a>
+        <a href="#apply" id="link-04-报名">报名</a>
+        <a href="#join" id="link-05-加群">加群</a>
+      </nav>
+      <a class="top-cta" href="#apply" id="link-06-报名">报名</a>
+    </div>
+    <div class="prog" aria-hidden="true"><i id="prog-fill" style="transform: scaleX(0);"></i></div>
+  </header>
+<main class="page">
+
+    <!-- ============ HERO ============ -->
+    <section class="hero visible" id="hero">
+      <div class="hero-in">
+        <h1 class="h1">网络攻防与信息安全</h1>
+
+        <p class="lede">攻击与防御，是同一门手艺 —— 欢迎来实验室一起折腾。背后那些不是装饰，是真的在跑的代码：逐字打出来，打错了会删掉重打，改主意了整行重写。</p>
+
+        <a class="btn" href="#directions" id="link-07-看看四个方向">看看四个方向</a>
+      </div>
+    </section>
+
+    <!-- ============ 研究方向 ============ -->
+    <section class="sec visible" id="directions">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">DIRECTIONS</span>你想做什么？</h2>
+
+        <div class="dir-list">
+          <button class="dir-row reveal visible" data-direction="软件" data-dir="sw" type="button" style="--i: 0;">
+            <span class="dir-cn">软件</span>
+            <span class="dir-idx" aria-hidden="true">01</span>
+            <span class="dir-code">+ strncpy(buf, input, n-1)</span>
+            <span class="dir-desc">写代码 · 修漏洞 · 逆向分析</span>
+          </button>
+
+          <button class="dir-row reveal visible" data-direction="硬件" data-dir="hw" type="button" style="--i: 1;">
+            <span class="dir-cn">硬件</span>
+            <span class="dir-idx" aria-hidden="true">02</span>
+            <span class="dir-code">+ verify(firmware)</span>
+            <span class="dir-desc">拆设备 · 焊板子 · 跑固件</span>
+          </button>
+
+          <button class="dir-row reveal visible" data-direction="算法" data-dir="al" type="button" style="--i: 2;">
+            <span class="dir-cn">算法</span>
+            <span class="dir-idx" aria-hidden="true">03</span>
+            <span class="dir-code">+ 2^32 次 · 生日碰撞</span>
+            <span class="dir-desc">数学是武器，也是防线</span>
+          </button>
+
+          <button class="dir-row reveal" data-direction="人工智能" data-dir="ai" type="button" style="--i: 3;">
+            <span class="dir-cn">人工智能</span>
+            <span class="dir-idx" aria-hidden="true">04</span>
+            <span class="dir-code">+ predict(x + 0.01)</span>
+            <span class="dir-desc">用 AI 攻，也用 AI 守</span>
+          </button>
+        </div>
+
+        <p class="hint" id="dir-hint">点一行，方向会自动填进报名表。</p>
+      </div>
+    </section>
+
+    <!-- ============ 流程 + 公告 ============ -->
+    <section class="sec" id="flow">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">FLOW</span>接下来会发生什么</h2>
+
+        <ol class="tl" id="tl-list">
+          <li class="tl-item reveal tl-active" data-phase="warmup" style="--i: 0;">
+            <span class="tl-when">现在</span>
+            <h3 class="tl-title">预热了解</h3>
+            <p class="tl-desc">加入招新群，了解实验室日常与研究方向。群里只做通知，不作为报名依据。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="signup" style="--i: 1;">
+            <span class="tl-when">国庆假期后</span>
+            <h3 class="tl-title">正式报名</h3>
+            <p class="tl-desc">网站开放完整报名表，群内同步发布链接与截止时间。<strong>所有人必须通过本页面提交</strong>，群接龙、私聊都不算报名。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="review" style="--i: 2;">
+            <span class="tl-when">报名截止后</span>
+            <h3 class="tl-title">初筛与面试</h3>
+            <p class="tl-desc">我们审阅报名表并筛出面试名单。面试安排将在招新群内公布。</p>
+          </li>
+          <li class="tl-item reveal" data-phase="result" style="--i: 3;">
+            <span class="tl-when">面试结束后</span>
+            <h3 class="tl-title">结果公布</h3>
+            <p class="tl-desc">录取名单在招新群内公布。</p>
+          </li>
+        </ol>
+
+        <div class="notices">
+          <h3 class="h3">公告</h3>
+          <div id="notice-list" class="notice-list reveal"><article class="notice pinned"><h3>招新预热中</h3><p class="notice-meta">置顶 · <span class="mono">9月11日 10:01</span></p><p class="notice-body">实验室招新即将开始。正式报名预计在国庆假期后开放，具体时间会在招新群内和本页面同步通知。
+
+欢迎先加入招新群了解实验室的日常。</p></article></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 报名 ============ -->
+    <section class="sec apply" id="apply">
+      <div class="shell">
+        <!-- 文档面：比纸面略深的一块底板，标题栏写清这是什么 -->
+        <div class="pane">
+          <div class="pane-bar">
+            <span class="pane-name">报名表</span>
+            <span class="pane-meta"><span class="mono" id="doc-progress">0 / 9</span> 必填项</span>
+          </div>
+          <!-- 完成度读数：一条随必填项推进的线 -->
+          <div class="pane-meter" aria-hidden="true"><i id="meter-fill" style="transform: scaleX(0);"></i></div>
+
+          <div class="pane-body">
+            <!-- 报名未开放时的提示条 -->
+            <div id="phase-banner" class="banner"><strong>报名尚未开放</strong>　预计 10月8日 10:00 开放。可以先加入下方招新群，开放时会第一时间在群里通知。</div>
+
+            <!-- 本设备已提交过的记录 -->
+            <div id="device-card" class="banner" hidden=""></div>
+
+            <!-- 编辑模式提示条 -->
+            <div id="edit-banner" class="edit-banner" hidden="">
+              <span id="edit-banner-text"></span>
+              <button type="button" id="edit-cancel" class="link-btn">退出修改</button>
+            </div>
+
+            <form id="app-form" novalidate="" class="is-closed">
+              <div class="field">
+                <label for="student_id">学号 <span class="req">*</span></label>
+                <input type="text" id="student_id" name="student_id" required="" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="2026xxxxxx" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="name">姓名 <span class="req">*</span></label>
+                <input type="text" id="name" name="name" required="" autocomplete="name" maxlength="20" placeholder="你的名字" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="class_name">班级 <span class="req">*</span></label>
+                <input type="text" id="class_name" name="class_name" required="" maxlength="30" placeholder="如：网络工程 2 班" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="major">专业 <span class="req">*</span></label>
+                <input type="text" id="major" name="major" required="" maxlength="30" placeholder="如：网络工程 / 计算机科学与技术" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="contact_type">联系方式类型 <span class="req">*</span></label>
+                <select id="contact_type" name="contact_type" required="" disabled="">
+                  <option value="" disabled="" selected="">选择类型</option>
+                  <option value="wechat">微信号</option>
+                  <option value="phone">手机号</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="contact">联系方式 <span class="req">*</span></label>
+                <input type="text" id="contact" name="contact" required="" maxlength="50" autocomplete="off" placeholder="微信号或手机号" disabled="">
+              </div>
+
+              <div class="field">
+                <label for="direction">方向 <span class="req">*</span></label>
+                <select id="direction" name="direction" required="" disabled="">
+                  <option value="" disabled="" selected="">选择方向</option>
+                  <option value="软件">软件</option>
+                  <option value="硬件">硬件</option>
+                  <option value="算法">算法</option>
+                  <option value="人工智能">人工智能</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="captcha_answer">人机验证 <span class="req">*</span></label>
+                <div class="captcha-row">
+                  <img id="captcha-img" class="captcha-img" alt="验证码（点击可更换）" width="150" height="50" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%2250%22%20viewBox%3D%220%2C0%2C150%2C50%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23f4f4f4%22%2F%3E%3Cpath%20fill%3D%22%23e7597d%22%20d%3D%22M86.47%2020.65L86.53%2020.71L85.22%2020.75L85.16%2020.69Q83.53%2020.95%2083.34%2022.57L83.21%2022.44L83.23%2022.46Q83.12%2022.99%2083.15%2023.79L83.31%2023.95L83.28%2023.91Q83.26%2025.42%2084.27%2026.50L84.24%2026.47L84.19%2026.41Q85.26%2027.54%2086.78%2027.42L86.90%2027.54L86.88%2027.51Q88.51%2027.38%2089.13%2026.64L89.09%2026.61L89.12%2026.64Q89.88%2025.80%2090.09%2024.00L90.12%2024.02L90.22%2024.13Q90.28%2022.17%2089.27%2021.50L89.30%2021.53L89.28%2021.51Q88.60%2020.89%2086.46%2020.64ZM91.41%2028.16L91.45%2028.20L90.24%2029.87L90.24%2029.86Q88.25%2033.90%2085.22%2037.17L85.18%2037.14L85.05%2037.00Q83.89%2037.29%2081.72%2037.93L81.69%2037.90L81.65%2037.85Q85.97%2032.84%2088.51%2028.99L88.54%2029.02L88.53%2029.01Q87.59%2029.42%2086.27%2029.48L86.29%2029.49L86.28%2029.49Q83.99%2029.74%2082.77%2028.15L82.69%2028.06L82.74%2028.12Q81.70%2026.77%2080.82%2023.10L80.76%2023.05L80.90%2023.19Q80.74%2022.66%2080.62%2021.91L80.71%2022.00L80.68%2021.98Q80.58%2021.24%2080.58%2020.88L80.64%2020.94L80.54%2020.84Q80.54%2019.40%2081.39%2018.91L81.45%2018.96L81.52%2019.03Q82.38%2018.30%2083.88%2018.30L83.99%2018.42L83.84%2018.27Q86.56%2018.41%2086.56%2018.41L86.47%2018.33L86.53%2018.39Q88.29%2018.44%2089.30%2018.59L89.21%2018.49L89.26%2018.55Q90.85%2018.63%2091.58%2019.03L91.58%2019.03L91.63%2019.08Q92.78%2019.74%2092.93%2021.15L92.95%2021.17L93.03%2021.24Q92.95%2021.35%2092.80%2023.49L92.87%2023.57L92.73%2023.43Q92.52%2025.23%2092.33%2025.90L92.35%2025.92L92.36%2025.93Q91.98%2026.99%2091.37%2028.12ZM93.00%2030.14L92.90%2030.05L92.94%2030.09Q93.76%2028.34%2094.19%2024.88L94.05%2024.74L94.17%2024.87Q94.30%2023.00%2094.27%2022.30L94.28%2022.32L94.32%2022.36Q94.35%2020.91%2093.40%2020.18L93.32%2020.10L93.02%2019.95L93.12%2020.06Q92.86%2019.40%2092.13%2018.88L92.20%2018.95L92.14%2018.89Q90.30%2018.09%2086.45%2017.97L86.35%2017.87L86.45%2017.97Q85.63%2017.92%2083.68%2017.92L83.68%2017.93L83.77%2018.02Q82.26%2017.90%2081.06%2018.46L81.02%2018.42L81.10%2018.49Q80.26%2019.21%2080.32%2020.68L80.29%2020.65L80.32%2020.68Q80.41%2021.35%2080.56%2022.97L80.66%2023.07L80.60%2023.01Q81.04%2025.07%2081.26%2025.75L81.29%2025.78L81.18%2025.67Q81.76%2027.29%2082.52%2028.33L82.45%2028.25L82.42%2028.23Q82.61%2028.48%2082.92%2028.79L82.99%2028.85L83.05%2028.92Q83.30%2029.32%2083.82%2030.05L83.69%2029.92L83.78%2030.01Q84.89%2031.03%2086.45%2031.18L86.60%2031.34L86.44%2031.17Q85.03%2033.43%2083.77%2034.96L83.82%2035.01L80.77%2038.38L80.88%2038.49Q82.71%2037.91%2084.02%2037.63L83.86%2037.46L83.87%2037.47Q83.41%2038.33%2082.15%2039.71L82.05%2039.61L82.09%2039.64Q84.46%2038.80%2086.97%2038.77L87.06%2038.86L87.01%2038.82Q88.85%2036.70%2092.34%2030.89L92.44%2031.00L92.33%2030.95L92.44%2031.06Q92.68%2030.50%2092.95%2030.10ZM87.98%2022.52L88.00%2022.55L88.04%2022.59Q88.52%2022.48%2088.88%2022.58L89.01%2022.71L88.92%2022.62Q89.43%2022.69%2089.73%2022.78L89.85%2022.90L89.79%2022.84Q89.93%2023.19%2089.99%2023.53L89.90%2023.44L89.95%2023.49Q89.92%2023.74%2089.83%2024.04L89.80%2024.02L89.87%2024.08Q89.87%2025.49%2088.93%2026.38L88.86%2026.31L88.96%2026.42Q88.04%2027.08%2086.72%2027.05L86.77%2027.10L86.78%2027.11Q86.56%2027.23%2085.34%2026.98L85.16%2026.81L85.30%2026.95Q85.12%2026.24%2085.12%2025.66L85.06%2025.60L84.98%2025.52Q85.09%2025.48%2085.09%2025.30L85.02%2025.23L85.07%2025.28Q85.03%2023.46%2086.86%2022.82L86.84%2022.80L86.81%2022.77Q87.34%2022.56%2088.02%2022.56Z%22%2F%3E%3Cpath%20d%3D%22M14%2017%20C71%2036%2C54%2045%2C147%2030%22%20stroke%3D%22%23eccf78%22%20fill%3D%22none%22%2F%3E%3Cpath%20fill%3D%22%23e56fe5%22%20d%3D%22M34.83%2038.35L34.86%2038.38L34.78%2038.30Q33.17%2038.07%2031.42%2037.94L31.43%2037.95L31.36%2037.88Q30.22%2036.74%2028.08%2033.65L28.16%2033.73L28.04%2033.62Q26.25%2036.07%2024.32%2038.03L24.26%2037.96L22.58%2038.28L22.59%2038.29Q21.76%2038.47%2020.97%2038.68L21.09%2038.81L20.96%2038.68Q24.29%2035.34%2026.71%2032.04L26.90%2032.23L26.79%2032.12Q24.25%2028.84%2019.90%2024.99L19.79%2024.87L19.87%2024.95Q21.65%2025.54%2023.82%2025.87L23.80%2025.85L23.80%2025.86Q26.55%2028.33%2028.08%2030.50L28.06%2030.48L28.05%2030.48Q29.73%2027.99%2031.93%2025.97L31.97%2026.01L32.06%2026.10Q34.52%2025.84%2035.99%2025.44L35.87%2025.32L35.89%2025.34Q32.29%2028.32%2029.33%2031.99L29.31%2031.98L29.31%2031.97Q31.91%2035.61%2034.69%2038.21ZM37.03%2024.71L37.14%2024.81L37.11%2024.78Q34.78%2025.46%2031.94%2025.73L31.95%2025.75L31.81%2025.61Q29.50%2027.76%2028.12%2029.74L28.13%2029.76L28.19%2029.81Q27.45%2028.95%2026.13%2027.36L26.29%2027.51L26.09%2027.47L26.06%2027.44Q25.88%2027.36%2025.79%2027.36L25.83%2027.39L25.80%2027.36Q25.29%2026.79%2023.98%2025.63L23.91%2025.57L23.80%2025.46Q20.98%2025.08%2018.68%2024.10L18.67%2024.09L18.67%2024.09Q23.22%2028.06%2026.47%2032.19L26.47%2032.19L26.50%2032.23Q23.74%2035.89%2020.19%2039.35L20.09%2039.25L20.11%2039.26Q20.43%2039.31%2023.24%2038.63L23.16%2038.56L23.10%2038.49Q21.92%2039.61%2020.61%2040.68L20.67%2040.75L20.64%2040.71Q23.21%2039.98%2025.75%2039.82L25.72%2039.79L25.79%2039.87Q27.57%2037.92%2029.10%2035.71L29.15%2035.76L29.09%2035.70Q30.36%2037.24%2031.34%2038.19L31.37%2038.23L31.37%2038.22Q31.31%2038.08%2031.37%2038.14L31.47%2038.24L31.65%2038.26L31.69%2038.31Q32.61%2039.10%2033.68%2039.95L33.63%2039.90L33.70%2039.98Q36.60%2040.43%2038.92%2041.25L38.83%2041.16L38.79%2041.12Q33.98%2037.68%2031.01%2033.52L30.96%2033.48L30.91%2033.42Q33.86%2029.39%2037.53%2026.12L37.55%2026.14L37.64%2026.23Q36.90%2026.53%2036.10%2026.71L35.93%2026.55L34.35%2026.95L34.41%2027.01Q35.35%2026.27%2037.09%2024.77Z%22%2F%3E%3Cpath%20fill%3D%22%233fcfcf%22%20d%3D%22M58.37%2028.88L58.36%2028.87L58.53%2029.04Q56.45%2028.89%2055.38%2029.86L55.40%2029.89L55.30%2029.78Q54.15%2030.69%2054.40%2032.71L54.49%2032.80L54.57%2032.88Q54.69%2034.78%2055.67%2035.79L55.81%2035.93L55.80%2035.92Q56.64%2036.97%2058.36%2036.91L58.25%2036.80L58.22%2036.78Q58.82%2036.91%2058.97%2036.91L58.92%2036.87L58.85%2036.79Q61.65%2036.26%2061.75%2032.56L61.91%2032.73L61.75%2032.57Q61.79%2030.65%2061.24%2030.01L61.25%2030.02L61.31%2030.08Q60.53%2029.12%2058.48%2029.00ZM61.18%2038.45L61.14%2038.42L61.11%2038.38Q60.05%2038.85%2058.80%2038.79L58.78%2038.78L58.85%2038.85Q55.68%2038.91%2054.63%2036.83L54.75%2036.94L54.69%2036.89Q54.58%2041.21%2053.51%2044.64L53.43%2044.56L53.38%2044.51Q52.04%2045.01%2050.73%2045.59L50.60%2045.46L50.73%2045.59Q52.83%2040.84%2052.61%2035.24L52.63%2035.25L52.49%2035.11Q52.39%2029.72%2050.07%2024.86L50.03%2024.82L50.06%2024.85Q51.64%2025.83%2053.02%2026.19L52.97%2026.14L53.31%2027.25L53.44%2027.38Q53.53%2027.65%2053.75%2028.54L53.62%2028.41L53.63%2028.42Q54.49%2026.81%2057.37%2026.66L57.44%2026.73L57.33%2026.62Q58.07%2026.62%2058.77%2026.62L58.81%2026.66L59.22%2026.67L59.19%2026.64Q59.28%2026.64%2059.43%2026.67L59.49%2026.73L59.71%2026.71L59.67%2026.66Q61.39%2026.95%2061.97%2027.13L62.00%2027.16L61.89%2027.04Q63.21%2027.55%2063.92%2028.31L63.74%2028.13L63.76%2028.16Q64.45%2029.12%2064.42%2030.25L64.48%2030.31L64.43%2030.26Q64.54%2032.67%2063.90%2034.81L63.81%2034.72L63.80%2034.71Q63.09%2037.64%2061.19%2038.46ZM64.59%2038.93L64.48%2038.78L64.43%2038.74Q65.45%2037.27%2065.69%2033.97L65.60%2033.88L65.69%2033.97Q65.82%2032.57%2065.82%2031.56L65.71%2031.45L65.77%2031.51Q65.77%2030.29%2065.16%2029.15L65.15%2029.15L65.27%2029.26Q64.86%2028.83%2064.46%2028.52L64.37%2028.43L64.38%2028.34L64.14%2028.01L64.15%2027.93L64.18%2027.96Q62.78%2026.31%2059.29%2026.31L59.17%2026.19L58.86%2026.38L58.77%2026.28Q54.95%2026.20%2053.64%2027.48L53.78%2027.63L53.81%2027.65Q53.60%2027.17%2053.47%2026.77L53.40%2026.69L53.24%2025.89L53.17%2025.82Q51.18%2025.33%2049.40%2024.14L49.42%2024.15L49.39%2024.12Q52.14%2029.32%2052.38%2035.13L52.30%2035.05L52.27%2035.02Q52.45%2040.79%2050.15%2045.99L50.15%2045.99L51.81%2045.35L51.85%2045.39Q51.56%2045.90%2051.01%2047.16L51.17%2047.32L51.06%2047.21Q53.18%2046.30%2055.05%2046.02L55.15%2046.13L55.23%2046.20Q55.97%2042.17%2056.09%2039.17L56.05%2039.13L56.18%2039.26Q57.28%2040.42%2060.18%2040.61L60.23%2040.65L60.10%2040.52Q63.30%2040.75%2064.46%2038.80L64.52%2038.85ZM60.04%2030.82L59.96%2030.75L60.06%2030.85Q60.57%2030.78%2061.46%2031.05L61.38%2030.98L61.42%2031.01Q61.63%2031.81%2061.60%2032.75L61.48%2032.63L61.51%2032.67Q61.56%2033.44%2061.40%2033.96L61.32%2033.88L61.33%2033.89Q60.81%2036.28%2058.80%2036.53L58.78%2036.51L58.84%2036.48L58.84%2036.48Q58.93%2036.63%2058.84%2036.66L58.79%2036.62L58.23%2036.48L58.33%2036.58Q57.43%2036.63%2056.64%2036.24L56.53%2036.13L56.30%2034.52L56.34%2034.56Q56.18%2032.66%2057.22%2031.83L57.12%2031.73L57.25%2031.86Q57.96%2030.89%2059.89%2030.68Z%22%2F%3E%3Cpath%20d%3D%22M13%2040%20C82%2034%2C56%2039%2C146%2034%22%20stroke%3D%22%23ca7ae5%22%20fill%3D%22none%22%2F%3E%3Cpath%20fill%3D%22%23e1c369%22%20d%3D%22M119.52%2029.82L119.36%2029.66L119.37%2029.67Q119.31%2028.73%20117.75%2028.15L117.77%2028.16L117.72%2028.11Q117.34%2027.98%20116.92%2027.98L116.97%2028.04L116.95%2028.01Q115.85%2028.02%20114.99%2028.48L115.09%2028.57L114.96%2028.44Q113.90%2029.07%20113.99%2030.05L114.03%2030.08L114.08%2030.13Q114.31%2032.35%20114.19%2034.16L114.22%2034.19L114.15%2034.12Q113.95%2036.00%20113.37%2038.02L113.36%2038.01L113.49%2038.14Q111.78%2038.54%20110.84%2038.88L110.74%2038.79L110.75%2038.79Q111.97%2035.83%20111.97%2032.61L112.01%2032.65L112.12%2032.76Q112.02%2028.29%20109.94%2024.71L109.95%2024.72L110.07%2024.84Q111.04%2025.23%20112.97%2025.81L112.90%2025.74L112.93%2025.77Q113.12%2026.30%20113.43%2027.52L113.42%2027.52L113.37%2027.47Q114.48%2025.83%20117.60%2025.89L117.56%2025.84L117.63%2025.92Q118.78%2025.90%20119.43%2026.00L119.56%2026.13L119.49%2026.05Q121.86%2026.35%20121.92%2027.97L122.01%2028.06L121.82%2027.87Q121.87%2028.62%20121.72%2029.45L121.74%2029.47L121.83%2029.56Q121.51%2031.63%20121.66%2034.04L121.50%2033.89L121.52%2033.90Q121.73%2036.29%20122.53%2038.34L122.45%2038.26L122.57%2038.38Q121.06%2037.91%20119.68%2037.79L119.83%2037.93L119.79%2037.90Q119.36%2035.94%20119.30%2033.80L119.22%2033.72L119.41%2033.90Q119.27%2031.62%20119.45%2029.75ZM119.52%2038.20L119.49%2038.17L119.37%2038.06Q120.11%2038.15%20121.15%2038.34L121.22%2038.40L121.41%2039.15L121.52%2039.25Q121.51%2039.49%20121.70%2039.92L121.86%2040.09L121.76%2039.99Q123.68%2040.41%20125.86%2041.36L125.70%2041.21L125.75%2041.25Q123.89%2038.78%20123.34%2035.72L123.36%2035.74L123.37%2035.75Q123.11%2034.06%20123.20%2031.09L123.19%2031.07L123.07%2030.96Q123.18%2030.82%20123.21%2030.18L123.10%2030.07L123.12%2030.09Q123.28%2029.69%20123.21%2029.29L123.10%2029.18L123.09%2029.17Q123.10%2027.92%20122.21%2027.53L122.25%2027.56L122.23%2027.55Q121.98%2026.75%20121.37%2026.26L121.51%2026.39L121.44%2026.32Q120.12%2025.56%20117.68%2025.62L117.68%2025.63L117.69%2025.63Q116.09%2025.57%20115.42%2025.72L115.48%2025.78L115.44%2025.75Q114.36%2026.10%20113.59%2026.83L113.56%2026.80L113.56%2026.80Q113.36%2026.26%20113.05%2025.44L113.05%2025.44L113.08%2025.46Q110.89%2024.99%20109.42%2024.19L109.46%2024.22L109.39%2024.16Q111.95%2028.18%20111.95%2032.80L111.87%2032.72L111.79%2032.65Q111.90%2036.27%20110.37%2039.36L110.36%2039.35L110.31%2039.30Q110.80%2038.99%20111.84%2038.69L111.94%2038.80L111.85%2038.70Q111.46%2039.72%20111.03%2040.52L111.03%2040.51L111.10%2040.58Q112.12%2040.11%20114.97%2039.65L115.00%2039.68L114.98%2039.66Q115.92%2035.68%20115.83%2031.79L115.72%2031.68L115.75%2031.71Q115.66%2030.98%20116.61%2030.40L116.74%2030.53L116.67%2030.46Q117.42%2029.86%20118.31%2029.77L118.48%2029.95L118.49%2029.96Q118.85%2029.91%20119.18%2030.07L119.03%2029.91L119.01%2029.90Q119.07%2032.12%20119.10%2034.17L118.94%2034.02L119.00%2034.08Q118.98%2036.04%20119.37%2038.06Z%22%2F%3E%3Cpath%20d%3D%22M8%2029%20C75%2024%2C59%204%2C143%205%22%20stroke%3D%22%234fe2bd%22%20fill%3D%22none%22%2F%3E%3C%2Fsvg%3E">
+                  <input type="text" id="captcha_answer" name="captcha_answer" required="" maxlength="8" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入图中字符" disabled="">
+                  <button type="button" id="captcha-refresh" class="link-btn" disabled="">换一张</button>
+                </div>
+              </div>
+
+              <div class="field full">
+                <label for="intro">个人简介 <span class="req">*</span></label>
+                <textarea id="intro" name="intro" rows="4" required="" maxlength="200" placeholder="简单介绍下自己，为什么想加入（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full">
+                <label for="learned">已学内容 <span class="opt">选填</span></label>
+                <textarea id="learned" name="learned" rows="3" maxlength="200" placeholder="学过的语言 / 框架 / 做过的东西（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full">
+                <label for="ai_views">对 AI 发展的看法 <span class="opt">选填</span></label>
+                <textarea id="ai_views" name="ai_views" rows="3" maxlength="200" placeholder="随意聊聊，一两句也行（不超过 200 字）" disabled=""></textarea>
+              </div>
+
+              <div class="field full actions">
+                <button type="submit" class="submit" id="submit-btn" disabled="">报名未开放</button>
+                <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+              </div>
+
+              <!-- 编辑码掉落后的人工兜底入口 -->
+              <div class="field full" id="have-token-wrap" hidden="">
+                <label for="edit_token_input">已有编辑码？</label>
+                <div class="captcha-row">
+                  <input type="text" id="edit_token_input" maxlength="64" autocomplete="off" placeholder="粘贴首次提交时保存的编辑码">
+                  <button type="button" id="edit-start" class="link-btn">修改我的报名</button>
+                </div>
+              </div>
+
+              <p class="form-foot" id="form-foot">验证码看不清或无法完成？发送邮件至 lab@example.com 人工报名。</p>
+            <input type="text" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true" disabled="" style="position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></form>
+
+            <!-- 提交成功后一次性展示编辑码 -->
+            <div id="token-panel" class="token-panel" hidden="">
+              <h3>请立即保存你的编辑码</h3>
+              <p class="token-note">这是你之后修改报名信息的唯一凭证，<strong>我们不会再显示它</strong>。建议截图或复制到备忘录。</p>
+              <div class="token-box">
+                <code id="token-value"></code>
+                <button type="button" id="token-copy" class="link-btn">复制</button>
+              </div>
+              <p class="token-warn">请勿把编辑码发给他人。丢失编辑码需联系管理员人工核验身份。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 加群 + 友链 ============ -->
+    <section class="sec" id="join">
+      <div class="shell">
+        <h2 class="h2"><span class="h2-en">GROUP</span>先加群，别错过通知</h2>
+
+        <div class="join-grid">
+          <div class="qr">
+            <img id="qr-img" alt="招新群二维码" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='1'%20height='1'/%3E" hidden="">
+            <p id="qr-fallback" class="hint">招新群二维码暂未配置。请稍后再来，或通过下方邮箱联系我们。</p>
+          </div>
+          <div class="join-info">
+            <p>群里只做通知：报名开放、面试安排、结果公布都会在这里同步。</p>
+            <p class="warn">二维码 7 天后会失效。<strong>建议转发本页链接，不要转发二维码截图</strong>——截图过期后同学就扫不进来了。</p>
+            <p id="join-contact" class="hint">群二维码失效或群已满？请联系 lab@example.com 拉你进群。</p>
+          </div>
+        </div>
+
+        <div class="links-block">
+          <h3 class="h3">友情链接</h3>
+          <div id="link-list" class="link-list reveal"><article class="link-card reveal" tabindex="0" role="button" aria-expanded="false"><div class="name"><span>第一个网站</span><span class="chev">→</span></div><div class="desc">这里是第一个网站的简介，点击卡片展开后可在新标签页打开。</div><a class="open-btn" href="https://example.com/1" target="_blank" rel="noopener noreferrer" id="link-08-在新标签页打开">在新标签页打开 ↗</a></article><article class="link-card reveal" tabindex="0" role="button" aria-expanded="false"><div class="name"><span>第二个网站</span><span class="chev">→</span></div><div class="desc">这里是第二个网站的简介，点击卡片展开后可在新标签页打开。</div><a class="open-btn" href="https://example.com/2" target="_blank" rel="noopener noreferrer" id="link-09-在新标签页打开">在新标签页打开 ↗</a></article></div>
+        </div>
+
+        <footer class="foot">© 2026 网络攻防与信息安全实验室</footer>
+      </div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

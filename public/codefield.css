@@ -1,0 +1,315 @@
+/* ============================================================
+   代码场域 —— 页面上侧的一条代码带
+   z-index 0，内容面板盖在它下缘的渐隐区上。代码带保持 alpha 1.0 全饱和：
+   压暗会让语法颜色消失，代码就退化成灰噪声（见计划 §1 的 alpha 实测）。
+
+   语法色取自 VSCode Dark+ 原生值，压在 #1f1f1f 上全部 ≥4.5:1，
+   所以不需要为了对比度调色 —— 这是「原生 VSCode」能成立的前提。
+   ============================================================ */
+
+/* ⚠ 高度必须定义在 :root 上，不能只写在 .cf 里。
+   .cf 和页面内容是**兄弟**关系，自定义属性不跨兄弟继承 ——
+   写在 .cf 上时，.hero 里的 var(--cf-h, 340px) 会一直取那个兜底值 340px，
+   于是面板位置在窄屏上悄悄错了（实测 320px 下偏了 44px）。
+   :root 上定义一次，两边都读得到。 */
+:root {
+  /* 代码带高度：页面上侧的一小部分，剩下的页面是纯黑。
+     46vh 是有意的：玻璃卡片压在上面时，卡片下方还能露出一段没被遮的原始代码。 */
+  --cf-h: clamp(300px, 46vh, 460px);
+  /* 渐隐起点：从这个高度开始，代码和底一起淡向透明（＝露出下面的纯黑） */
+  --cf-fade: 46%;
+}
+/* 矮屏（横屏手机）：带子再压一点，别把内容都挤下去 */
+@media (max-height: 560px) {
+  :root { --cf-h: clamp(220px, 54vh, 320px); --cf-fade: 48%; }
+}
+
+.cf {
+  /* 字体：全部系统字体，零下载。等宽字是代码辨识度的必要条件，
+     语法颜色才是充分条件。 */
+  --cf-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+             "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --cf-fs: clamp(11px, 3.05vw, 12.5px);
+  --cf-lh: 1.62;
+  --cf-gut: 46px;            /* 行号栏宽度 */
+  --cf-top: 30px;            /* 顶部面包屑留白 */
+
+  /* fixed：内容从页面顶部开始、在带子上方滑过去。
+     这样每一张玻璃卡片往下滚的时候背后都有活的代码，
+     而不是只有第一屏能看到。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--cf-h);
+  z-index: 1;
+  overflow: hidden;
+  /* 底色透明，让下面的氛围层透上来 ——
+     这样整条带子都有色调起伏，玻璃卡片到处都有东西可透，
+     而不是只有代码那 360px 宽的范围里有。
+     顺带：代码的对比度按纯黑算反而更高（原来按 #1f1f1f 算的）。 */
+  background: transparent;
+  color: var(--ed-fg, #cccccc);
+  font-family: var(--cf-font);
+  font-size: var(--cf-fs);
+  line-height: var(--cf-lh);
+  font-variant-ligatures: none;       /* 连字会让逐字宽度不可预测，也会把 -> 变成箭头 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 底部渐隐到纯黑。
+     遮罩盖的是整个代码带（连底色一起），所以下面不是「被切一刀」，
+     而是代码和背景一起溶进页面的纯黑里。 */
+  -webkit-mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+  mask-image: linear-gradient(180deg,
+      #000 0, #000 var(--cf-fade), rgba(0,0,0,.42) 72%, rgba(0,0,0,.12) 90%, transparent 100%);
+
+  /* 提升为独立合成层：代码带每 tick 只重绘自己，不牵动整页 */
+  transform: translateZ(0);
+  contain: layout paint style;
+  user-select: none;
+  pointer-events: none;               /* 装饰层，绝不抢点击 */
+}
+
+@media (min-width: 900px) { .cf { --cf-fs: 13.5px; --cf-gut: 54px; } }
+/* 手机上把行号栏收窄，多出约 16px 给代码 */
+@media (max-width: 899px) { .cf { --cf-gut: 30px; } }
+
+/* ---------- 顶部面包屑：告诉你现在看的是哪个文件 ---------- */
+.cf-meta {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: var(--cf-top);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 0.84em;
+  color: var(--syn-ln, #8a9199);
+  opacity: .72;
+}
+.cf-file { color: var(--syn-fn, #dcdcaa); }
+.cf-lang { color: var(--syn-ln, #8a9199); }
+.cf-meta::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: .16;
+}
+
+/* ---------- 主体 ---------- */
+.cf-body { position: absolute; left: 0; right: 0; }
+
+/* 所有档共用：可滚动区只占代码带的上部，底边留给渐隐区。
+   正在打字/正在输出的那一行必须待在完全清晰的位置，
+   不能已经落进渐隐里 —— 否则最新的内容反而最看不清。 */
+.cf-body { bottom: 36%; }
+
+/* 编辑器档：顶对齐，内容往下长，超出后由 JS 设 scrollTop 跟随光标。
+   overflow:hidden 而不是 clip —— clip 会禁止程序滚动。
+   注意：之前这里用 transform: translateY(--cf-shift) 做跟随，
+   但 CSP 的 style-src 会拦内联样式属性；scrollTop 不碰样式，更省心。 */
+.cf-body.is-editor {
+  top: var(--cf-top);
+  overflow: hidden;
+}
+
+/* 终端 / 依赖日志：顶对齐往下长，超出后往上滚（followBottom）。
+   之前这里是 justify-content: flex-end 做底对齐，
+   后果是第一行出现在带子底部然后往上长 —— 就是「从下往上」的观感。 */
+.cf-body.is-terminal,
+.cf-body.is-install {
+  top: var(--cf-top);
+  overflow: hidden;
+  display: block;
+}
+
+/* ---------- 编辑器行 ---------- */
+.cf-body.is-editor { counter-reset: ln; }
+
+.cf-line {
+  position: relative;
+  padding-left: var(--cf-gut);
+  padding-right: 16px;
+  min-height: calc(1em * var(--cf-lh));
+  white-space: pre;
+}
+.cf-line::before {
+  counter-increment: ln;
+  content: counter(ln);
+  position: absolute;
+  left: 0;
+  width: calc(var(--cf-gut) - 14px);
+  text-align: right;
+  color: var(--syn-ln, #8a9199);
+  opacity: 0;
+}
+/* 行号跟着打字一起出现；没打到的行不留行号，避免「空的文档却有 20 行号」 */
+.cf-line.is-started::before { opacity: 1; }
+
+/* 当前行高亮 —— 编辑器的原生行为 */
+.cf-line.is-cur { background: rgba(255,255,255,.035); }
+
+/* 光标：竖条，放在当前 token 的尾部（不能放行尾，因为后面的 token 只是透明了） */
+.cf-t.is-cur::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.06em;
+  margin-right: -2px;
+  vertical-align: -0.16em;
+  background: var(--syn-caret, #aeafad);
+  animation: cf-blink 1.06s steps(1, end) infinite;
+}
+@keyframes cf-blink { 0%, 55% { opacity: 1 } 56%, 100% { opacity: 0 } }
+
+/* 未打到的 token：文本已经在 DOM 里占好位置（所以打字过程中零位移），只是不显示 */
+.cf-t.is-hid { opacity: 0; }
+
+/* 打错：红色波浪下划线，和 VSCode 的报错提示同款。
+   意义不只是好看 —— 它让「打错了」这件事在屏幕上是看得见的，
+   否则观众只会看到字符莫名其妙变少，读不出「作者改了个错」。 */
+.cf-t.is-typo {
+  color: var(--ed-del, #f48771);
+  text-decoration: underline wavy var(--ed-del, #f48771);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* 选中全部（换档时的「全选删除」）—— VSCode 选区蓝
+   注意选择器是 .cf-body.is-selecting：类加在 .cf-body 上，不是 .cf 上。 */
+.cf-body.is-selecting .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* 整行重写：这一行被全选，同样用选区蓝。
+   和「全选删除」是同一个视觉语言 —— 都是「选起来准备动它」。 */
+.cf-line.is-selected .cf-t { background: var(--syn-sel, #264f78); color: transparent; }
+
+/* ---------- 暂停徽标 ----------
+   用户一开始填表，代码带就停下并挂上这个标记。
+   为什么要显示：动画突然不动会被当成卡死，说清楚「是我故意停的」才不会误解。
+
+   暂停图标用两段 CSS 画的竖条，不用 ⏸ 这类字符 ——
+   它们大多落在 U+23xx 符号区，等宽字体的覆盖很不稳（可能变成豆腐块）。 */
+.cf-hold {
+  /* fixed 到视口：卡片盖住代码带时也能看见（挂在 .cf 外面，见 HTML 注释） */
+  position: fixed;
+  z-index: 4;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, .20);
+  border-radius: 999px;
+  /* ⚠ 徽标自己也是一块玻璃，但它必须比卡片厚得多。
+     徽标是浮在代码带最亮那一段上的（带子顶部），背后常有高亮 token；
+     沿用卡片的淡 tint 时，实测文字对比度只有 3.23:1（320px）。
+     小控件没有余地，所以这里 .90 不透明 + brightness(.7) 压暗背后。
+     卡片可以很透，因为卡片里的文字下方有留白；徽标没有。 */
+  background: rgba(8, 9, 13, .90);
+  -webkit-backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  backdrop-filter: blur(14px) saturate(150%) brightness(.7);
+  color: #e8e8e8;
+  font-family: var(--cf-font);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.cf-hold[hidden] { display: none; }
+/* 只在 paused-reduced 之外真正显示；:not([hidden]) 已经挡了，这里再给个渐入 */
+.cf-hold:not([hidden]) { opacity: 1; }
+
+.cf-hold-bars {
+  position: relative;
+  width: 8px;
+  height: 10px;
+  flex: none;
+}
+.cf-hold-bars::before,
+.cf-hold-bars::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 10px;
+  background: currentColor;
+}
+.cf-hold-bars::before { left: 0 }
+.cf-hold-bars::after  { right: 0 }
+
+/* ---------- 终端 / 日志行 ---------- */
+.cf-tline { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cf-body.is-install .cf-tline { padding-left: var(--cf-gut); }
+
+/* ---------- 语法着色（VSCode Dark+ 原生值） ---------- */
+.k-kw { color: var(--syn-kw, #569cd6) }   /* 声明关键字 5.59:1 */
+.k-ct { color: var(--syn-ct, #c586c0) }   /* 控制流     5.92:1 */
+.k-ty { color: var(--syn-ty, #4ec9b0) }   /* 类型       8.09:1 */
+.k-fn { color: var(--syn-fn, #dcdcaa) }   /* 函数       11.66:1 */
+.k-va { color: var(--syn-va, #9cdcfe) }   /* 变量       11.05:1 */
+.k-st { color: var(--syn-st, #ce9178) }   /* 字符串     6.24:1 */
+.k-nu { color: var(--syn-nu, #b5cea8) }   /* 数字       9.70:1 */
+.k-cm { color: var(--syn-cm, #6a9955) }   /* 注释       4.95:1 */
+.k-an { color: var(--syn-an, #dcdcaa) }   /* 注解      11.66:1 */
+.k-pp { color: var(--syn-pp, #569cd6) }   /* 预处理     5.59:1 */
+.k-op { color: var(--syn-op, #d4d4d4) }
+.k-ws { color: inherit }
+
+/* ---------- 终端语义色 ---------- */
+.t-box  { color: var(--syn-ln, #8a9199) }
+.t-cmd  { color: var(--ed-fg, #cccccc) }
+.t-user { color: var(--syn-va, #9cdcfe) }
+.t-say  { color: var(--ed-fg, #cccccc) }
+.t-say::first-letter { color: var(--ed-accent, #4da3e8) }   /* ⏺ */
+.t-note { color: var(--syn-ln, #8a9199) }
+.t-code { color: var(--syn-va, #9cdcfe) }
+.t-add  { color: var(--ed-add, #4ec9b0); background: rgba(78,201,176,.10) }
+.t-del  { color: var(--ed-del, #f48771); background: rgba(244,135,113,.10) }
+.t-think { color: var(--syn-fn, #dcdcaa) }
+.t-log  { color: var(--syn-ln, #8a9199) }
+.t-build { color: var(--syn-ty, #4ec9b0) }
+.t-plain { color: var(--ed-fg, #cccccc) }
+
+/* ---------- 依赖下载的进度条 ----------
+   固定总宽度：填充在长、剩余在短，两者之和恒定，
+   所以右边的标签不会随着进度左右跳动。 */
+.t-bar { white-space: pre; }
+.bar-on  { color: var(--ed-accent, #4da3e8) }
+.bar-off { color: var(--syn-ln, #8a9199); opacity: .3 }
+.bar-lab { color: var(--syn-ln, #8a9199) }
+
+/* 减少动效：一切静止 */
+@media (prefers-reduced-motion: reduce) {
+  .cf-t.is-cur::after { animation: none }
+  .cf-body.is-editor { transition: none }
+}
+
+/* 打印 / 极端降级：不显示代码层 */
+@media print { .cf { display: none } }
+
+/* ============================================================
+   静态对照表用：同一套渲染，但参与文档流（不是固定全屏层）
+   —— 对照表里看到的必须和解效时看到的是同一套东西，
+      否则对照表就是自欺。所以复用的是同一个 paintStatic()。
+   ============================================================ */
+.cf.cf-sheet {
+  position: static;
+  inset: auto;
+  height: auto;
+  contain: none;
+  transform: none;
+  overflow: visible;
+  pointer-events: auto;
+  border: 1px solid var(--ed-border, #2b2b2b);
+  background: var(--ed-bg, #1f1f1f);
+}
+.cf.cf-sheet .cf-meta { position: static; height: auto; padding: 7px 12px; }
+.cf.cf-sheet .cf-body { position: static; transform: none; transition: none; overflow: visible; max-height: none; }
+.cf.cf-sheet .cf-body.is-terminal,
+.cf.cf-sheet .cf-body.is-install { display: block; }
+.cf.cf-sheet .cf-line::before { opacity: 1; }

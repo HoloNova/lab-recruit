@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="editor-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>代码场域 · 原型</title>
+  <!-- 原型目的只有一个：证明「代码是整个页面的背景」，不是一个组件。
+       所以这里搭了四个区块，代码层固定在 0 层贯穿全页，区块之间的缝里也看得到它。
+
+       ⚠ 样式和脚本都在外部文件：服务的 CSP 是 default-src 'self'，
+          内联 <style> / <script> 会被拦掉（实测踩到的坑）。
+       ⚠ 场域根节点的 id 必须不是 codefield —— HTML 的 id 会成为 window 同名全局量。 -->
+  <link rel="stylesheet" href="/api/themes.css">
+  <link rel="stylesheet" href="/codefield.css">
+  <link rel="stylesheet" href="/preview/codefield-proto.css">
+</head>
+<body>
+
+  <!-- ============ 代码场域：钉在页面上侧的一条带子，底部渐隐到纯黑 ============
+       内容在它上方滑过去，玻璃卡片把背后的代码糊出来。 -->
+  <div class="cf" id="cf-root" data-mode="editor" aria-hidden="true">
+    <div class="cf-meta">
+      <span class="cf-file">AuthController.java</span>
+      <span class="cf-lang">java</span>
+    </div>
+    <div class="cf-body is-editor"></div>
+  </div>
+
+  <main class="page">
+
+    <!-- ============ hero：面板压在代码带的渐隐区上 ============ -->
+    <section class="hero" >
+      <!-- 玻璃卡片横跨内容宽度：这样它一定压在代码上（代码在左侧），
+           背后的代码被糊成色块透出来，玻璃才成立。
+           之前卡片靠右对齐，而代码只到左边三分之一 —— 卡片背后是空的，
+           玻璃就只是一块深灰。这是实测采像素才发现的。 -->
+      <div class="panel hero-panel">
+        <div class="hero-copy">
+          <p class="sub">网络攻防与信息安全实验室</p>
+          <h1>把四个方向写成四种代码</h1>
+          <p class="lede">背后那些不是装饰，是真的在跑的代码：逐字打出来，打错了会删掉重打，改主意了整行重写。</p>
+          <div class="tags">
+            <span class="tag" data-dir="软件">软件</span>
+            <span class="tag" data-dir="硬件">硬件</span>
+            <span class="tag" data-dir="算法">算法</span>
+            <span class="tag" data-dir="人工智能">人工智能</span>
+          </div>
+        </div>
+        <div class="hero-act">
+          <button class="cta" type="button">报名</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 缝：这里露出的是未被遮挡的活代码 -->
+    <div class="gap" aria-hidden="true"></div>
+
+    <!-- ============ 方向：点一行，背景立刻切到那个方向 ============ -->
+    <section class="sec" id="directions" >
+      <div class="wrap"><div class="panel">
+        <h2>四个方向</h2>
+        <p class="kicker">点一行，背景会切到那个方向的代码</p>
+        <button class="dir-row" type="button" data-id="sw">
+          <span class="dir-cn">软件</span>
+          <span class="dir-code">AuthController.java · Java</span>
+          <span class="dir-note">写代码 · 修漏洞 · 逆向分析</span>
+        </button>
+        <button class="dir-row" type="button" data-id="hw">
+          <span class="dir-cn">硬件</span>
+          <span class="dir-code">fw_load.c · C</span>
+          <span class="dir-note">拆设备 · 焊板子 · 跑固件</span>
+        </button>
+        <button class="dir-row" type="button" data-id="al">
+          <span class="dir-cn">算法</span>
+          <span class="dir-code">birthday.py · Python</span>
+          <span class="dir-note">数学是武器，也是防线</span>
+        </button>
+        <button class="dir-row" type="button" data-id="ai">
+          <span class="dir-cn">人工智能</span>
+          <span class="dir-code">claude · 终端会话</span>
+          <span class="dir-note">用 AI 攻，也用 AI 守</span>
+        </button>
+      </div></div>
+    </section>
+
+    <div class="gap" aria-hidden="true"></div>
+
+    <!-- ============ 流程：本来就是提交历史 ============ -->
+    <section class="sec" id="flow">
+      <div class="wrap"><div class="panel">
+        <h2>流程</h2>
+        <p class="kicker">在这段时间里，背景会停下来</p>
+        <div class="log">
+          <div><i>○</i> <b>报名开放</b> <em>· 线上填表，随时可以改</em></div>
+          <div><i>○</i> <b>笔试</b> <em>· 90 分钟，基础 + 一题实战</em></div>
+          <div><i>○</i> <b>面试</b> <em>· 聊你做过的东西，不用背题</em></div>
+          <div><i>○</i> <b>进组</b> <em>· 选方向，跟项目</em></div>
+        </div>
+      </div></div>
+    </section>
+
+    <div class="gap" aria-hidden="true"></div>
+
+    <!-- ============ 报名：点进任意一个框，背景就该停，并挂出暂停徽标 ============ -->
+    <section class="sec" id="apply">
+      <div class="wrap"><div class="panel">
+        <h2>报名</h2>
+        <p class="kicker">输入即暂停 · 玻璃卡片 · 背景不推动版面</p>
+        <p class="lede">背景是钉在页面上侧的，不会把这张卡片往下推；卡片是玻璃的，背后的代码会透过来。</p>
+        <p class="lede lede-quiet">点进任意一个框 → 背景暂停，右上角出现暂停徽标。离开约 0.8 秒后自动恢复，
+          而且是<strong>接着演</strong>而不是重新开始。</p>
+        <div class="fields">
+          <label class="fld"><span>学号</span><input type="text" name="student_id" autocomplete="off" inputmode="numeric"></label>
+          <label class="fld"><span>方向</span>
+            <select name="direction">
+              <option>软件</option><option>硬件</option><option>算法</option><option>人工智能</option>
+            </select>
+          </label>
+        </div>
+      </div></div>
+    </section>
+
+    <div class="gap" aria-hidden="true"></div>
+    <div class="gap" aria-hidden="true"></div>
+  </main>
+
+  <!-- ============ 开发控制条（正式版没有这条） ============ -->
+  <div class="ctl">
+    <b>原型</b>
+    <button type="button" data-go="sw" aria-pressed="true">软件 · Java</button>
+    <button type="button" data-go="hw" aria-pressed="false">硬件 · C</button>
+    <button type="button" data-go="al" aria-pressed="false">算法 · Python</button>
+    <button type="button" data-go="ai" aria-pressed="false">人工智能 · 终端</button>
+    <button type="button" id="pause" aria-pressed="false">暂停轮播</button>
+  </div>
+
+  <!-- 暂停徽标：用户开始填表就出现。
+       ⚠ 必须挂在 .cf 外面：.cf 上有 transform: translateZ(0)，
+          它会成为 position:fixed 的包含块，徽标会被钉在带子里出不来；
+          而且 .cf 有 contain:paint，子元素也溢不出去。
+       挂在页面层 + fixed 到视口右上角，这样卡片盖住带子时徽标照样看得见。
+       图标用两段 CSS 画的竖条，不用 ⏸ 这类字符
+       （U+23xx 在等宽字体里覆盖不稳，可能变豆腐块）。 -->
+  <span class="cf-hold" hidden>
+    <i class="cf-hold-bars" aria-hidden="true"></i>
+    <span class="cf-hold-text">已暂停</span>
+  </span>
+
+  <script src="/codefield-data.js"></script>
+  <script src="/codefield.js"></script>
+  <script src="/preview/codefield-proto.js"></script>
+</body>
+</html>

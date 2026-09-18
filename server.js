@@ -100,6 +100,39 @@ function settingsView(repo, cfg) {
   };
 }
 
+// ---------------------------------------------------------------- 主题仓库
+
+/**
+ * 把 themes/*.css 按文件名排序拼接成一个样式表。
+ *
+ * 加一个主题 = 丢一个文件，不改引擎代码。这也正是「仓库」的意义。
+ * ETag 由每个文件的 mtime+size 派生，所以改主题文件后下次请求立即生效，
+ * 不需要重启服务（与二维码换图的处理方式一致）。
+ *
+ * @returns {{css: string, etag: string|null, files: number}}
+ */
+function buildThemesCss(dir) {
+  let names;
+  try {
+    names = fs.readdirSync(dir).filter((n) => n.endsWith('.css')).sort();
+  } catch {
+    return { css: '', etag: null, files: 0 };
+  }
+  const parts = [];
+  const stamps = [];
+  for (const name of names) {
+    const file = path.join(dir, name);
+    let st;
+    try { st = fs.statSync(file); } catch { continue; }
+    if (!st.isFile()) continue;
+    stamps.push(`${name}:${st.mtimeMs.toString(36)}:${st.size.toString(36)}`);
+    parts.push(`/* ——— ${name} ——— */\n${fs.readFileSync(file, 'utf8')}`);
+  }
+  if (!parts.length) return { css: '', etag: null, files: 0 };
+  const etag = `"th${crypto.createHash('sha256').update(stamps.join('|')).digest('base64url').slice(0, 22)}"`;
+  return { css: parts.join('\n'), etag, files: parts.length };
+}
+
 // ---------------------------------------------------------------- 应用工厂
 
 function createApp(options = {}) {
@@ -304,6 +337,19 @@ function createApp(options = {}) {
 
   app.get('/api/links', (req, res) => {
     res.json({ ok: true, links: repo.getLinks() });
+  });
+
+  // ---- 主题仓库 ----
+  app.get('/api/themes.css', (req, res) => {
+    const { css, etag, files } = buildThemesCss(config.THEMES_DIR);
+    if (!files) {
+      res.set('Cache-Control', 'no-store');
+      return res.status(404).type('text/css').send('/* themes/ 下没有主题文件 */');
+    }
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'no-cache'); // 允许缓存但每次回源校验；改主题后立即生效
+    if (req.get('if-none-match') === etag) return res.status(304).end();
+    res.type('text/css').send(css);
   });
 
   app.get('/api/wechat-qr', (req, res) => {
@@ -611,4 +657,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createApp, normalizeIp, isUniqueViolation, parseCookies, contentHashOf };
+module.exports = { createApp, normalizeIp, isUniqueViolation, parseCookies, contentHashOf, buildThemesCss };

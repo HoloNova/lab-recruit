@@ -1,0 +1,356 @@
+/* ============================================================
+   D2 · 警戒线 HAZARD —— 一条警戒线拉在机器前面
+
+   主张：**这个页面是被围起来的现场。**
+   安全行业最日常的物件不是终端，是警戒线：它标记「这里发生过事情」。
+   于是全页的结构全部由警戒黄胶带完成 —— 章节是胶带、标签是胶带、
+   报名的动作是胶带；除胶带之外一律骨白到灰，零玻璃、零渐变、零发光。
+
+   风险与它的理由：
+   · 墨黑 + 单一亮色是所有暗色页面的默认长相（我认这条风险）。
+     区分点不在颜色而在**胶带作为结构**：黄色只出现在「分隔、标记、动作」三种
+     语义上，不做装饰、不做发光、不做渐变；正文一律骨白/灰。
+   · 四个方向**不编号**（它们不是序列）；流程**编号 01–04**（它真的是序列）。
+   · 左侧一条固定的警戒黄胶带（带墨色短刻线）—— 页面唯一始终可见的品牌物。
+
+   场域（活代码）仍然是整屏背景，全部保留：见 base.css。
+   ============================================================ */
+
+.sd-d2 {
+  --ink: #0A0A0C;
+  --ink-2: #141416;
+  --ink-3: #1C1C1F;
+  --tape: #F2C200;          /* 警戒黄：只做结构、标记、动作 */
+  --tape-ink: #17130A;
+  --bone: #F4F2EC;
+  --gray: #A8A49C;
+  --gray-2: #A8A49C;   /* 没有第三档：亮底上 3.16:1 的信息字是废字，见实测 */
+
+  --sd-focus: var(--tape);
+  --sd-gutter-line: rgba(244, 242, 236, .10);
+  --sd-field-top: 150px;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --col: max(20px, calc((100vw - 780px) / 2));
+
+  background: var(--ink);
+  color: var(--bone);
+}
+
+.sd-d2 .rail { display: none; }
+
+/* 左侧那条胶带：固定，全高，带墨色短刻线 */
+.sd-d2::before {
+  content: '';
+  position: fixed; left: 0; top: 0; bottom: 0; width: 10px; z-index: 3;
+  background:
+    repeating-linear-gradient(180deg, var(--tape-ink) 0 2px, transparent 2px 26px),
+    var(--tape);
+}
+@media (max-width: 899px) { .sd-d2::before { width: 6px; } }
+
+.sd-d2 .mono, .sd-d2 .h2-en, .sd-d2 .tl-when, .sd-d2 .pane-meta,
+.sd-d2 .hint, .sd-d2 .foot, .sd-d2 .req, .sd-d2 .opt, .sd-d2 .chrome,
+.sd-d2 .h2, .sd-d2 .tl-title, .sd-d2 .pane-name, .sd-d2 .dir-cn, .sd-d2 .chip {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 顶栏：一条押在页面顶部的胶带 ================= */
+
+.sd-d2 .top {
+  position: sticky; top: 0; z-index: 4;
+  background: var(--tape);
+  color: var(--tape-ink);
+}
+.sd-d2 .top-in {
+  display: flex; align-items: stretch; gap: 4px;
+  height: 56px; padding: 0 var(--col);
+  overflow-x: auto; scrollbar-width: none;
+}
+.sd-d2 .top-in::-webkit-scrollbar { display: none; }
+.sd-d2 .tab { display: inline-flex; align-items: center; flex: none; font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.sd-d2 .tab-ext { opacity: .65; }
+.sd-d2 .nav { display: none; align-items: stretch; gap: 2px; }
+.sd-d2 .nav a {
+  display: inline-flex; align-items: center; padding: 0 12px;
+  font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--tape-ink);
+  border-bottom: 3px solid transparent;
+}
+.sd-d2 .nav a:hover { border-bottom-color: var(--tape-ink); }
+.sd-d2 .top-cta {
+  display: inline-flex; align-items: center; margin-left: auto; align-self: center;
+  padding: 0 16px; background: var(--tape-ink); color: var(--tape);
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+}
+.sd-d2 .prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; }
+.sd-d2 .prog i { display: block; height: 100%; width: 0; background: var(--tape-ink); }
+@media (min-width: 820px) { .sd-d2 .nav { display: flex; } }
+
+/* ================= HERO：直接喊在机器上 ================= */
+
+.sd-d2 .page { position: relative; z-index: 2; padding: 0 0 72px; }
+
+.sd-d2 .hero { padding: clamp(28px, 7vh, 64px) var(--col) clamp(34px, 8vh, 72px); }
+.sd-d2 .hero-in {
+  max-width: 900px;
+  /* 标题压在会动的亮代码上，必须给一块确定性暗底：
+     实测手机端曾出现背后 205,205,205（亮 token），骨白字只剩 1.42:1 */
+  background: radial-gradient(120% 86% at 4% 34%, rgba(10, 10, 12, .92) 0 44%, rgba(10, 10, 12, .66) 70%, transparent 100%);
+  padding: 6px 0;
+}
+.sd-d2 .h1 {
+  font-family: var(--mono);
+  font-size: clamp(34px, 8.4vw, 62px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.08;
+  color: var(--bone);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .8);
+}
+/* 标题下面压的一条胶带 */
+.sd-d2 .h1::after {
+  content: '';
+  display: block;
+  width: min(190px, 42vw);
+  height: 10px;
+  background: var(--tape);
+  margin-top: 18px;
+}
+.sd-d2 .lede {
+  max-width: 44ch;
+  margin: 22px 0 28px;
+  font-size: 16px;
+  color: var(--gray);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, .85);
+}
+.sd-d2 .btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 0 24px; min-height: 50px;
+  background: var(--tape); color: var(--tape-ink);
+  font-family: var(--mono); font-size: 15px; font-weight: 700;
+}
+.sd-d2 .btn::after { content: '↗'; }
+.sd-d2 .btn:hover { background: #FFD400; }
+
+/* ================= 章节 = 整幅胶带封起来的带子 ================= */
+
+.sd-d2 .sec {
+  background: rgba(10, 10, 12, .78);
+  border-top: 10px solid var(--tape);      /* 胶带：章节分隔就是它 */
+  border-bottom: 1px solid rgba(244, 242, 236, .12);
+}
+.sd-d2 .sec + .sec { margin-top: 12px; }   /* 缝 = 一条裸露的活代码，不分段就被自己盖死了 */
+.sd-d2 .shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px var(--col) 40px;
+}
+.sd-d2 .h2 {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  font-size: clamp(20px, 4.6vw, 26px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--bone);
+  margin-bottom: 22px;
+}
+/* 眉标 = 一枚胶带标签 */
+.sd-d2 .h2-en {
+  order: -1; flex-basis: 100%;
+  display: inline-block; width: fit-content;
+  font-size: 11px; font-weight: 700; letter-spacing: .18em;
+  color: var(--tape-ink); background: var(--tape);
+  padding: 3px 8px;
+}
+
+/* ================= 方向：四行，左侧一条会变宽的胶带 ================= */
+
+.sd-d2 .dir-list { display: grid; gap: 2px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .dir-row {
+  position: relative;
+  display: grid; grid-template-columns: 1fr; gap: 3px;
+  padding: 16px 14px 16px 22px;
+  background: rgba(20, 20, 22, .70);   /* 半透明：带子里也要能看见机器在动 */
+  border: 0; font: inherit; text-align: left; cursor: pointer; color: inherit;
+}
+.sd-d2 .dir-idx { display: none; }        /* 方向不是序列，序号是装饰 */
+.sd-d2 .dir-row::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; background: rgba(244, 242, 236, .16);
+  transition: width 140ms ease, background 140ms ease;
+}
+.sd-d2 .dir-row:hover, .sd-d2 .dir-row:focus-visible { background: #1A1A1D; outline: none; }
+.sd-d2 .dir-row:hover::before, .sd-d2 .dir-row:focus-visible::before,
+.sd-d2 .dir-row[aria-pressed="true"]::before { width: 12px; background: var(--tape); }
+.sd-d2 .dir-row[aria-pressed="true"] { background: #1A1A1D; }
+.sd-d2 .dir-cn { font-size: 21px; font-weight: 700; letter-spacing: -.01em; color: var(--bone); }
+.sd-d2 .dir-code { font-family: var(--mono); font-size: 13px; }
+.sd-d2 [data-dir="sw"] .dir-code { color: var(--dir-sw); }
+.sd-d2 [data-dir="hw"] .dir-code { color: var(--dir-hw); }
+.sd-d2 [data-dir="al"] .dir-code { color: var(--dir-al); }
+.sd-d2 [data-dir="ai"] .dir-code { color: var(--dir-ai); }
+.sd-d2 .dir-desc { font-size: 14.5px; color: var(--gray); }
+.sd-d2 #dir-hint { margin-top: 18px; font-size: 12.5px; color: var(--gray-2); }
+
+/* ================= 流程：真的有序，所以 01–04 ================= */
+
+.sd-d2 .tl { list-style: none; display: grid; gap: 2px; }
+.sd-d2 .tl-item {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 16px;
+  padding: 16px;
+  background: rgba(20, 20, 22, .70);
+  counter-increment: tg;
+}
+.sd-d2 .tl { counter-reset: tg; }
+.sd-d2 .tl-item::before { display: none; }
+.sd-d2 .tl-when {
+  grid-column: 1; grid-row: 1 / span 3;
+  font-size: 26px; font-weight: 700; color: var(--gray-2);
+  letter-spacing: -.03em; min-width: 48px;
+}
+.sd-d2 .tl-when::before { content: counter(tg, decimal-leading-zero); }
+.sd-d2 .tl-when { font-size: 0; }
+.sd-d2 .tl-when::before { font-size: 26px; }
+.sd-d2 .tl-title { grid-column: 2; font-size: 18px; color: var(--bone); margin-bottom: 3px; }
+.sd-d2 .tl-desc { grid-column: 2; font-size: 14.5px; color: var(--gray); }
+.sd-d2 .tl-desc strong { color: var(--bone); }
+.sd-d2 .tl-item[data-phase="warmup"] { box-shadow: inset 4px 0 0 var(--tape); }
+.sd-d2 .tl-item[data-phase="warmup"] .tl-when::before { color: var(--tape); }
+.sd-d2 .tl-item[data-phase="warmup"] .tl-title::after {
+  content: '进行中'; margin-left: 10px;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  background: var(--tape); color: var(--tape-ink); padding: 3px 7px;
+}
+
+.sd-d2 .h3 {
+  font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--tape); margin: 28px 0 10px;
+}
+.sd-d2 .notice-list { display: grid; gap: 1px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .notice-list > * { background: var(--ink-2); padding: 16px; }
+.sd-d2 .notice h3 { font-size: 17px; color: var(--bone); margin-bottom: 4px; }
+.sd-d2 .notice-meta { font-family: var(--mono); font-size: 11.5px; color: var(--gray-2); margin-bottom: 8px; }
+.sd-d2 .notice-body { font-size: 14.5px; color: var(--gray); }
+.sd-d2 .notice.pinned { box-shadow: inset 4px 0 0 var(--tape); }
+
+/* ================= 报名表：一块夹在胶带里的板子 ================= */
+
+.sd-d2 .pane {
+  background: #101012;
+  border: 1px solid rgba(244, 242, 236, .16);
+}
+.sd-d2 .pane-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--tape); color: var(--tape-ink);
+  font-size: 13px; font-weight: 700;
+}
+.sd-d2 .pane-name { font-size: 14px; }
+.sd-d2 .pane-meta { margin-left: auto; font-size: 12px; }
+.sd-d2 .pane-meta .mono { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.sd-d2 .pane-meter { height: 4px; background: rgba(244, 242, 236, .14); }
+.sd-d2 .pane-meter i { display: block; height: 100%; width: 0; background: var(--tape); }
+.sd-d2 .pane-body { padding: 22px 16px 24px; }
+
+.sd-d2 .field label { display: flex; align-items: baseline; gap: 6px; color: var(--bone); font-weight: 600; font-size: 14px; }
+.sd-d2 .req { color: var(--tape); font-weight: 700; }
+.sd-d2 .opt { color: var(--gray-2); font-size: 11px; letter-spacing: .06em; }
+
+.sd-d2 input[type="text"], .sd-d2 select, .sd-d2 textarea {
+  background: #08080A; color: var(--bone);
+  border: 1px solid rgba(244, 242, 236, .20);
+  border-radius: 0; font-family: var(--mono); font-size: 16px;
+}
+.sd-d2 input::placeholder, .sd-d2 textarea::placeholder { color: var(--gray-2); }
+.sd-d2 input:focus, .sd-d2 select:focus, .sd-d2 textarea:focus {
+  outline: none; border-color: var(--tape);
+  box-shadow: 0 0 0 3px rgba(242, 194, 0, .22);
+}
+.sd-d2 textarea { font-family: var(--mono); }
+
+.sd-d2 .captcha-img { border: 1px solid rgba(244, 242, 236, .2); background: #fff; }
+.sd-d2 .link-btn {
+  background: none; border: 1px solid var(--tape); color: var(--tape);
+  font-family: var(--mono); font-size: 12.5px; padding: 0 10px; cursor: pointer;
+}
+.sd-d2 .submit {
+  min-height: 52px; padding: 0 28px;
+  background: var(--tape); color: var(--tape-ink);
+  border: 0; font-family: var(--mono); font-size: 15px; font-weight: 700;
+  cursor: pointer;
+}
+.sd-d2 .submit:hover { background: #FFD400; }
+.sd-d2 .form-status { font-family: var(--mono); font-size: 12.5px; color: var(--gray); }
+.sd-d2 .form-foot { font-size: 12.5px; color: var(--gray-2); }
+
+.sd-d2 .banner, .sd-d2 .edit-banner {
+  padding: 14px; margin-bottom: 16px;
+  background: #15161A; border: 1px solid rgba(244, 242, 236, .16);
+  box-shadow: inset 4px 0 0 var(--tape);
+  font-size: 14px; color: var(--gray);
+}
+.sd-d2 #device-card { box-shadow: inset 4px 0 0 var(--gray-2); }
+.sd-d2 .token-panel {
+  margin-top: 20px; padding: 20px 16px;
+  background: #15161A; border: 1px solid rgba(244, 242, 236, .16);
+  box-shadow: inset 4px 0 0 var(--dir-ai);
+}
+.sd-d2 .token-panel h3 { font-size: 17px; margin-bottom: 8px; }
+.sd-d2 .token-note, .sd-d2 .token-warn { font-size: 13.5px; color: var(--gray); }
+.sd-d2 .token-note strong { color: var(--bone); }
+.sd-d2 .token-warn { color: var(--tape); }
+.sd-d2 .token-box {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 12px;
+  background: #08080A; border: 1px solid rgba(244, 242, 236, .2);
+}
+.sd-d2 .token-box code { flex: 1; min-width: 0; font-family: var(--mono); font-size: 15px; color: var(--dir-ai); overflow-wrap: anywhere; }
+
+/* ================= 加群 / 友链 / 页脚 ================= */
+
+.sd-d2 .qr {
+  display: grid; place-items: center; gap: 8px; padding: 14px; min-height: 168px;
+  background: #0E0E10; border: 1px dashed rgba(244, 242, 236, .22);
+}
+.sd-d2 .qr img { width: 150px; height: 150px; background: #fff; }
+.sd-d2 #qr-fallback { text-align: center; font-size: 12px; color: var(--gray-2); max-width: 22ch; }
+.sd-d2 .join-info p { font-size: 14.5px; color: var(--gray); }
+.sd-d2 .warn { color: var(--tape); }
+.sd-d2 .warn strong { color: var(--bone); }
+
+.sd-d2 .link-list { display: grid; gap: 1px; background: rgba(244, 242, 236, .12); }
+.sd-d2 .link-card { display: grid; gap: 6px; background: var(--ink-2); padding: 14px 16px; cursor: pointer; }
+.sd-d2 .link-card:hover { background: #1A1A1D; }
+.sd-d2 .link-card .name { display: flex; justify-content: space-between; gap: 10px; color: var(--bone); font-size: 15px; font-weight: 600; }
+.sd-d2 .link-card .chev { font-family: var(--mono); color: var(--gray-2); transition: transform 160ms ease; }
+.sd-d2 .link-card[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.sd-d2 .link-card .desc { font-size: 12.5px; color: var(--gray); }
+.sd-d2 .link-card[aria-expanded="false"] .desc,
+.sd-d2 .link-card[aria-expanded="false"] .open-btn { display: none; }
+.sd-d2 .open-btn {
+  display: inline-flex; align-items: center; justify-self: start; padding: 0 12px;
+  font-family: var(--mono); font-size: 12.5px; color: var(--tape-ink);
+  background: var(--tape); border: 0;
+}
+.sd-d2 .foot {
+  margin-top: 30px; padding-top: 16px;
+  border-top: 6px solid var(--tape);
+  font-size: 11.5px; color: var(--gray-2);
+}
+
+/* ================= 固定栏：押在底部的带子 ================= */
+
+.sd-d2 .chrome {
+  background: var(--ink-2);
+  border-top: 6px solid var(--tape);
+  color: var(--gray);
+  font-size: 12px;
+}
+.sd-d2 .chrome-file, .sd-d2 .chrome-phase { padding: 0 14px; }
+.sd-d2 .chrome-dot { width: 7px; height: 7px; background: var(--tape); }
+.sd-d2 .chrome-link {
+  display: inline-flex; align-items: center; padding: 0 16px;
+  color: var(--gray); border-left: 1px solid rgba(244, 242, 236, .16);
+}
+.sd-d2 .chrome-link:hover { color: var(--tape); }
+.sd-d2 .chrome-cta { background: var(--tape); color: var(--tape-ink); font-weight: 700; }

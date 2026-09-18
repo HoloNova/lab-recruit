@@ -1,0 +1,35 @@
+/* ============================================================
+   Graphite Nebula —— 变体 B（叠在 graphite.css 之后）
+
+   与 A 的差别只有一处主张：**允许氛围存在，但只允许一个色相家族**
+   （冷蓝 → 青），外加一层极淡扫描线。A 是「仪器面板」，B 是「冷光下的仪器面板」。
+   风险更高、个性更强；如果你要的是"稳、专业、不花"，选 A。
+   ============================================================ */
+
+body::before {
+  background:
+    /* 扫描线：3px 一根，几乎不可见，只在深色区提供一点"屏幕"质感 */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .014) 0 1px, transparent 1px 3px),
+    /* 唯一主色相：冷蓝，压在右上 */
+    radial-gradient(120% 75% at 82% -12%, rgba(77, 163, 232, .20), transparent 62%),
+    /* 同家族的青，只做补色，不再引入第三个色相 */
+    radial-gradient(95% 65% at -5% 28%, rgba(78, 201, 176, .11), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 24px);
+  background-size: auto, auto, auto, auto;
+  -webkit-mask-image: radial-gradient(140% 100% at 50% 0%, #000 0 60%, transparent 100%);
+  mask-image: radial-gradient(140% 100% at 50% 0%, #000 0 60%, transparent 100%);
+}
+
+/* 玻璃：tint 略深，边缘带一点冷色（rim light），仍由发丝线定义面 */
+.shell, .hero-in {
+  background-color: rgba(18, 23, 34, .34);
+  border-color: rgba(77, 163, 232, .20);
+}
+
+/* 代码带下沿一条冷光 + 顶栏一条冷线：把"屏幕"的边界点亮，而不点亮整块面 */
+.cf { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 0 rgba(77, 163, 232, .18); }
+.top { box-shadow: 0 1px 0 rgba(77, 163, 232, .14); }
+
+/* 状态点 + 进度线：变体 B 允许一点发光（仍在同一色相内） */
+.top-status::before { box-shadow: 0 0 0 3px rgba(77, 163, 232, .18), 0 0 12px rgba(77, 163, 232, .45); }
+.prog i { box-shadow: 0 0 10px rgba(77, 163, 232, .5); }

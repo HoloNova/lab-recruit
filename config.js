@@ -63,6 +63,7 @@ const config = {
   PORT: intEnv('PORT', 3001),
   DB_PATH: process.env.DB_PATH || path.join(DATA_DIR, 'data.db'),
   PUBLIC_DIR: path.join(ROOT, 'public'),
+  THEMES_DIR: path.join(ROOT, 'themes'),
   QR_DIR: DATA_DIR,
   BACKUP_DIR: path.join(DATA_DIR, 'backup'),
 

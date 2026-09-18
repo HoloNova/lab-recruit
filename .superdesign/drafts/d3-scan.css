@@ -1,0 +1,373 @@
+/* ============================================================
+   D3 · 扫描 SCAN —— 这个页面是一次对实验室的扫描
+
+   主张：**四个方向不是四张卡片，是一张扫描结果表；这张表同时就是那台机器的档位。**
+   你指向哪一行，背后那台机器就切到那个文件（真实交互，见 app.js §2）。
+   于是「表」不是静态陈列，是一个活的读数 —— 这是本方向的签名。
+
+   其余两处结构决定：
+   · 流程是**真的序列**，所以用编号节点 + 连接线（traceroute 的跳数语言）。
+   · 章节不编号，只用方括号标签 `[ DIRECTIONS ]` —— 它们是索引，不是顺序。
+   · 右侧固定一条**竖向阶段轨道**（预热/报名/初筛面试/结果，中竖排），
+     它是服务端下发的真实阶段状态，不是装饰性进度条。
+
+   场域（活代码）保持整屏背景：见 base.css。
+   ============================================================ */
+
+.sd-d3 {
+  --ink: #0C0F14;
+  --panel: #12161D;
+  --panel-2: #171C25;
+  --line: rgba(255, 255, 255, .10);
+  --line-2: rgba(255, 255, 255, .18);
+  --fg: #E8ECF2;
+  --fg-2: #9AA5B4;
+  --fg-3: #8B95A4;   /* 仪器面板上也是一样：第三档不能比 4.5:1 更暗 */
+  --steel: #5B8CFF;          /* 状态与交互只用它 */
+
+  --sd-focus: var(--steel);
+  --sd-gutter-line: rgba(255, 255, 255, .08);
+  --sd-field-top: 92px;
+  --sd-anchor-gap: 124px;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --col: max(20px, calc((100vw - 820px) / 2));
+
+  background: var(--ink);
+  color: var(--fg);
+}
+
+.sd-d3 .mono, .sd-d3 .h2-en, .sd-d3 .tl-when, .sd-d3 .pane-meta, .sd-d3 .hint,
+.sd-d3 .foot, .sd-d3 .req, .sd-d3 .opt, .sd-d3 .chrome, .sd-d3 .dir-file,
+.sd-d3 .h2, .sd-d3 .h3, .sd-d3 .tab, .sd-d3 .nav a, .sd-d3 .btn, .sd-d3 .submit,
+.sd-d3 .link-btn, .sd-d3 .open-btn, .sd-d3 .rail, .sd-d3 .pane-name {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 顶栏：扫描头 ================= */
+
+.sd-d3 .top {
+  position: sticky; top: 0; z-index: 4;
+  background: rgba(12, 15, 20, .96);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.sd-d3 .top-in {
+  display: flex; align-items: stretch; gap: 4px;
+  height: 56px; padding: 0 var(--col);
+  overflow-x: auto; scrollbar-width: none;
+}
+.sd-d3 .top-in::-webkit-scrollbar { display: none; }
+.sd-d3 .tab { display: inline-flex; align-items: center; flex: none; font-size: 14.5px; font-weight: 600; color: var(--fg); letter-spacing: -.01em; }
+.sd-d3 .tab-ext { color: var(--fg-3); }
+.sd-d3 .nav { display: none; align-items: stretch; gap: 1px; margin-left: 10px; }
+.sd-d3 .nav a {
+  display: inline-flex; align-items: center; padding: 0 12px;
+  font-size: 13px; color: var(--fg-2);
+  border-bottom: 2px solid transparent;
+}
+.sd-d3 .nav a:hover { color: var(--fg); border-bottom-color: var(--steel); }
+.sd-d3 .top-cta {
+  display: inline-flex; align-items: center; margin-left: auto; align-self: center;
+  padding: 0 16px; background: var(--steel); color: #06101F;
+  font-size: 13px; font-weight: 700;
+}
+.sd-d3 .prog { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; }
+.sd-d3 .prog i { display: block; height: 100%; width: 0; background: var(--steel); }
+@media (min-width: 820px) { .sd-d3 .nav { display: flex; } }
+
+/* 固定栏改成**顶部扫描线**：压在扫描头下面，滚到哪都在 */
+.sd-d3 .chrome {
+  top: 56px; bottom: auto;
+  background: rgba(18, 22, 29, .96);
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-2);
+  font-size: 12px;
+}
+.sd-d3 .chrome-file, .sd-d3 .chrome-phase { padding: 0 14px; }
+.sd-d3 .chrome-file { color: var(--fg); }
+.sd-d3 .chrome-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--steel); box-shadow: 0 0 0 3px rgba(91, 140, 255, .18); }
+.sd-d3 .chrome-link {
+  display: inline-flex; align-items: center; padding: 0 16px;
+  color: var(--fg-2); border-left: 1px solid var(--line);
+}
+.sd-d3 .chrome-link:hover { color: var(--fg); }
+.sd-d3 .chrome-cta { color: var(--steel); font-weight: 700; }
+@media (max-width: 700px) {
+  .sd-d3 .chrome-file { font-size: 11px; }
+  .sd-d3 .chrome-phase { display: none; }
+}
+
+/* ================= 右侧竖向阶段轨道 ================= */
+
+.sd-d3 .rail { display: none; }
+@media (min-width: 1240px) {
+  .sd-d3 .rail {
+    display: flex; flex-direction: column; gap: 18px;
+    right: 22px; top: 50%; transform: translateY(-50%);
+    writing-mode: vertical-rl;
+    font-size: 11px; letter-spacing: .16em; color: var(--fg-3);
+  }
+  .sd-d3 .rail-i { gap: 8px; }
+  .sd-d3 .rail-i::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%;
+    border: 1px solid var(--line-2); background: transparent;
+  }
+  .sd-d3 .rail-i[data-phase="warmup"] { color: var(--fg); }
+  .sd-d3 .rail-i[data-phase="warmup"]::before { background: var(--steel); border-color: var(--steel); }
+}
+
+/* ================= 版面 ================= */
+
+.sd-d3 .page { position: relative; z-index: 2; padding: 26px 0 calc(72px + 56px); }
+
+.sd-d3 .shell {
+  max-width: 900px; margin: 0 auto;
+  padding: 28px var(--col) 32px;
+}
+.sd-d3 .sec {
+  background: rgba(12, 15, 20, .88);   /* 硬面板：这一版的身份不是透明，是仪器面 */
+  border-top: 1px solid var(--line);
+}
+.sd-d3 .sec + .sec { margin-top: 32px; }   /* 面板之间的缝 = 活代码露出来的地方 */
+
+.sd-d3 .h2 {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
+  font-size: clamp(20px, 4.4vw, 25px); font-weight: 600; letter-spacing: -.02em;
+  color: var(--fg); margin-bottom: 20px;
+}
+.sd-d3 .h2-en {
+  order: -1; flex-basis: 100%;
+  font-size: 11px; font-weight: 400; letter-spacing: .2em; color: var(--fg-3);
+}
+.sd-d3 .h2-en::before { content: '[ '; color: var(--steel); }
+.sd-d3 .h2-en::after { content: ' ]'; color: var(--steel); }
+
+/* ================= HERO ================= */
+
+.sd-d3 .hero { max-width: 900px; margin: 0 auto; padding: clamp(30px, 9vh, 92px) var(--col) clamp(36px, 8vh, 76px); }
+.sd-d3 .hero-in {
+  /* 标题压在活动场域上：给一块确定性暗底（实测手机端曾掉到 2.7:1） */
+  background: radial-gradient(120% 88% at 4% 40%, rgba(12, 15, 20, .93) 0 46%, rgba(12, 15, 20, .68) 72%, transparent 100%);
+  padding: 6px 0;
+}
+.sd-d3 .h1 {
+  font-size: clamp(30px, 6.6vw, 46px); font-weight: 700; letter-spacing: -.02em;
+  color: var(--fg); margin-bottom: 16px;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, .8);
+}
+.sd-d3 .lede {
+  max-width: 46ch; margin-bottom: 26px; font-size: 15.5px; color: var(--fg-2);
+  text-shadow: 0 1px 16px rgba(0, 0, 0, .85);
+}
+.sd-d3 .btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 0 20px; min-height: 46px;
+  background: var(--steel); color: #06101F;
+  font-size: 14px; font-weight: 700;
+}
+.sd-d3 .btn::after { content: '→'; font-weight: 400; }
+.sd-d3 .btn:hover { background: #7AA3FF; }
+
+/* ================= 方向 = 扫描结果表（活的） ================= */
+
+.sd-d3 .dir-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+.sd-d3 .dir-row {
+  display: grid;
+  grid-template-columns: minmax(78px, 108px) 1fr auto;
+  gap: 3px 16px;
+  align-items: baseline;
+  padding: 14px 12px 14px 14px;
+  background: rgba(18, 22, 29, .62);
+  border: 0; border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  font: inherit; text-align: left; cursor: pointer; color: inherit;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.sd-d3 .dir-row:hover, .sd-d3 .dir-row:focus-visible { background: var(--panel-2); outline: none; }
+.sd-d3 .dir-row[aria-pressed="true"] { background: var(--panel-2); }
+.sd-d3 .dir-idx { display: none; }   /* 方向不是序列 */
+.sd-d3 .dir-cn { font-size: 19px; font-weight: 650; color: var(--fg); }
+.sd-d3 .dir-desc { grid-column: 2; font-size: 14.5px; color: var(--fg-2); }
+.sd-d3 .dir-code { grid-column: 2; font-family: var(--mono); font-size: 12.5px; }
+.sd-d3 .dir-file {
+  grid-column: 3; grid-row: 1 / span 3;
+  align-self: center;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--fg-2);
+  white-space: nowrap;
+}
+.sd-d3 .dir-file::before { content: ''; }
+.sd-d3 .dir-file { font-size: 0; }
+.sd-d3 .dir-file::after { font-size: 11.5px; content: ''; }
+.sd-d3 [data-dir="sw"] .dir-file::after { content: 'AuthController.java'; }
+.sd-d3 [data-dir="hw"] .dir-file::after { content: 'fw_load.c'; }
+.sd-d3 [data-dir="al"] .dir-file::after { content: 'collision.py'; }
+.sd-d3 [data-dir="ai"] .dir-file::after { content: 'claude'; }
+.sd-d3 .dir-file::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255, 255, 255, .22); flex: none;
+}
+/* 行色 = 该方向在代码场域里的记号色（与语法色同源） */
+.sd-d3 [data-dir="sw"] .dir-code { color: var(--dir-sw); }
+.sd-d3 [data-dir="hw"] .dir-code { color: var(--dir-hw); }
+.sd-d3 [data-dir="al"] .dir-code { color: var(--dir-al); }
+.sd-d3 [data-dir="ai"] .dir-code { color: var(--dir-ai); }
+.sd-d3 [data-dir="sw"] { border-left-color: rgba(77, 163, 232, .35); }
+.sd-d3 [data-dir="hw"] { border-left-color: rgba(224, 164, 88, .35); }
+.sd-d3 [data-dir="al"] { border-left-color: rgba(197, 134, 224, .35); }
+.sd-d3 [data-dir="ai"] { border-left-color: rgba(78, 201, 176, .35); }
+.sd-d3 .dir-row[aria-pressed="true"] { border-left-color: var(--steel); border-left-width: 3px; }
+.sd-d3 .dir-row[aria-pressed="true"] .dir-file { color: var(--steel); }
+.sd-d3 .dir-row[aria-pressed="true"] .dir-file::before { background: var(--steel); }
+.sd-d3 #dir-hint { margin-top: 16px; font-size: 12.5px; color: var(--fg-3); }
+
+@media (max-width: 700px) {
+  /* 手机端：表退化成定义列表（标签在左，值在右），字段不换语言 */
+  .sd-d3 .dir-row { grid-template-columns: 1fr; gap: 4px; padding-left: 12px; }
+  .sd-d3 .dir-file { grid-column: 1; grid-row: auto; align-self: start; }
+  .sd-d3 .dir-desc, .sd-d3 .dir-code { grid-column: 1; }
+}
+
+/* ================= 流程：编号节点 + 连接线 ================= */
+
+.sd-d3 .tl { list-style: none; counter-reset: hop; }
+.sd-d3 .tl-item {
+  position: relative;
+  padding: 0 0 26px 40px;
+  border-left: 1px solid var(--line);
+  margin-left: 11px;
+  counter-increment: hop;
+}
+.sd-d3 .tl-item:last-child { padding-bottom: 0; border-left-color: transparent; }
+.sd-d3 .tl-item::before {
+  content: counter(hop, decimal-leading-zero);
+  position: absolute; left: -12px; top: 0;
+  width: 23px; height: 23px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 10px; color: var(--fg-2);
+  background: var(--ink); border: 1px solid var(--line-2); border-radius: 50%;
+}
+.sd-d3 .tl-item[data-phase="warmup"]::before {
+  color: #06101F; background: var(--steel); border-color: var(--steel);
+}
+.sd-d3 .tl-when { display: block; font-size: 11.5px; color: var(--fg-3); margin-bottom: 2px; letter-spacing: .04em; }
+.sd-d3 .tl-title { font-size: 17px; color: var(--fg); margin-bottom: 4px; }
+.sd-d3 .tl-item[data-phase="warmup"] .tl-title { color: var(--fg); }
+.sd-d3 .tl-desc { font-size: 14.5px; color: var(--fg-2); }
+.sd-d3 .tl-desc strong { color: var(--fg); }
+
+.sd-d3 .h3 { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--fg-3); margin: 28px 0 10px; }
+.sd-d3 .notice-list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.sd-d3 .notice-list > * { background: var(--panel); padding: 16px; }
+.sd-d3 .notice h3 { font-size: 17px; color: var(--fg); margin-bottom: 4px; }
+.sd-d3 .notice-meta { font-size: 11.5px; color: var(--fg-3); margin-bottom: 8px; }
+.sd-d3 .notice-body { font-size: 14.5px; color: var(--fg-2); }
+.sd-d3 .notice.pinned { border-left: 3px solid var(--steel); }
+
+/* ================= 报名表：一块仪器面板 ================= */
+
+.sd-d3 .pane { background: rgba(18, 22, 29, .82); border: 1px solid var(--line); }
+.sd-d3 .pane-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.sd-d3 .pane-name { font-size: 13.5px; color: var(--fg); }
+.sd-d3 .pane-meta { margin-left: auto; color: var(--fg-2); }
+.sd-d3 .pane-meta .mono { color: var(--steel); font-weight: 600; }
+.sd-d3 .pane-meter { height: 2px; background: var(--line); }
+.sd-d3 .pane-meter i { display: block; height: 100%; width: 0; background: var(--steel); }
+.sd-d3 .pane-body { padding: 22px 16px 24px; }
+
+.sd-d3 .field label { display: flex; align-items: baseline; gap: 6px; color: var(--fg); font-weight: 500; font-size: 14px; }
+.sd-d3 .req { color: var(--fg); }
+.sd-d3 .opt { color: var(--fg-3); font-size: 11px; letter-spacing: .06em; }
+
+.sd-d3 input[type="text"], .sd-d3 select, .sd-d3 textarea {
+  background: #080A0E; color: var(--fg);
+  border: 1px solid var(--line-2); border-radius: 3px;
+  font-size: 16.5px;
+}
+.sd-d3 textarea { font-family: var(--mono); }
+.sd-d3 input::placeholder, .sd-d3 textarea::placeholder { color: var(--fg-3); }
+.sd-d3 input:focus, .sd-d3 select:focus, .sd-d3 textarea:focus {
+  outline: none; border-color: var(--steel);
+  box-shadow: 0 0 0 3px rgba(91, 140, 255, .2);
+}
+.sd-d3 .captcha-img { border: 1px solid var(--line-2); background: #fff; }
+.sd-d3 .link-btn {
+  background: none; border: 1px solid var(--line-2); color: var(--steel);
+  font-size: 12.5px; padding: 0 10px; cursor: pointer;
+}
+.sd-d3 .link-btn:hover { border-color: var(--steel); }
+.sd-d3 .submit {
+  min-height: 50px; padding: 0 26px;
+  background: var(--steel); color: #06101F;
+  border: 0; border-radius: 3px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.sd-d3 .submit:hover { background: #7AA3FF; }
+.sd-d3 .form-status { font-size: 12.5px; color: var(--fg-2); }
+.sd-d3 .form-foot { font-size: 12.5px; color: var(--fg-3); }
+
+.sd-d3 .banner, .sd-d3 .edit-banner {
+  padding: 13px 14px; margin-bottom: 16px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--steel);
+  font-size: 14px; color: var(--fg-2); border-radius: 3px;
+}
+.sd-d3 #device-card { border-left-color: var(--fg-3); }
+.sd-d3 .token-panel {
+  margin-top: 20px; padding: 18px 16px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--dir-ai); border-radius: 3px;
+}
+.sd-d3 .token-panel h3 { font-size: 17px; margin-bottom: 8px; }
+.sd-d3 .token-note, .sd-d3 .token-warn { font-size: 13.5px; color: var(--fg-2); }
+.sd-d3 .token-note strong { color: var(--fg); }
+.sd-d3 .token-warn { color: var(--dir-del, #f48771); }
+.sd-d3 .token-box {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 12px;
+  background: #080A0E; border: 1px solid var(--line-2); border-radius: 3px;
+}
+.sd-d3 .token-box code { flex: 1; min-width: 0; font-family: var(--mono); font-size: 15px; color: var(--dir-ai); overflow-wrap: anywhere; }
+
+/* ================= 加群 / 友链 / 页脚 ================= */
+
+.sd-d3 .qr {
+  display: grid; place-items: center; gap: 8px; padding: 14px; min-height: 168px;
+  background: #080A0E; border: 1px dashed var(--line-2);
+}
+.sd-d3 .qr img { width: 150px; height: 150px; background: #fff; border-radius: 2px; }
+.sd-d3 #qr-fallback { text-align: center; font-size: 12px; color: var(--fg-3); max-width: 22ch; }
+.sd-d3 .join-info p { font-size: 14.5px; color: var(--fg-2); }
+.sd-d3 .warn { color: var(--dir-hw); }
+.sd-d3 .warn strong { color: var(--fg); }
+
+.sd-d3 .link-list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.sd-d3 .link-card { display: grid; gap: 6px; background: var(--panel); padding: 13px 15px; cursor: pointer; }
+.sd-d3 .link-card:hover { background: var(--panel-2); }
+.sd-d3 .link-card .name { display: flex; justify-content: space-between; gap: 10px; color: var(--fg); font-size: 15px; font-weight: 600; }
+.sd-d3 .link-card .chev { color: var(--fg-3); transition: transform 160ms ease; }
+.sd-d3 .link-card[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.sd-d3 .link-card .desc { font-size: 12.5px; color: var(--fg-2); }
+.sd-d3 .link-card[aria-expanded="false"] .desc,
+.sd-d3 .link-card[aria-expanded="false"] .open-btn { display: none; }
+.sd-d3 .open-btn {
+  display: inline-flex; align-items: center; justify-self: start; padding: 0 12px;
+  font-size: 12.5px; color: var(--steel); border: 1px solid var(--line-2); border-radius: 3px;
+}
+.sd-d3 .open-btn:hover { border-color: var(--steel); }
+.sd-d3 .foot {
+  margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--fg-3);
+}

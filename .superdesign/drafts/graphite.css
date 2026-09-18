@@ -1,0 +1,302 @@
+/* ============================================================
+   Graphite Console —— 材质覆盖层（设计稿）
+   叠在 style.css + themes/02-editor-dark.css 之后。
+
+   只改「材质」：颜色家族 / 透明度刻度 / 背景 / 代码带底板 / 精密感细节。
+   不改：布局、间距、字号、圆角、动效时长、DOM 结构、无障碍契约。
+
+   对应真实仓库的落地方式（二选一）：
+     (a) 把这套值写回 themes/*.css 的 --ed-* 契约，并把 style.css 里的
+         硬编码字面量换成 var() —— 干净，但要动 63 处；
+     (b) 保留本文件为覆盖层 —— 改动集中、可回滚。
+   ============================================================ */
+
+/* ---------- 1. 令牌：单一冷色相家族 + 有刻度的透明度 ---------- */
+:root {
+  /* 表面阶梯 */
+  --bg-0: #07090f;   /* 代码带底板 */
+  --bg-1: #0b0e15;   /* 页面底 */
+  --bg-2: #10141d;   /* 抬升面 */
+  --bg-3: #161b26;   /* 凹陷面：input / option / 内嵌块 */
+
+  /* 文字阶梯：9 个手挑灰 → 4 级 */
+  --fg-0: #f2f5fa;   /* 标题        17.66:1 */
+  --fg-1: #cbd2dd;   /* 正文        12.69:1 */
+  --fg-2: #939cab;   /* 次要/说明     6.97:1 */
+  --fg-3: #6b7484;   /* 占位/极弱     4.10:1（仅大字/装饰） */
+
+  /* 发丝线三档 */
+  --line-soft:   rgba(255, 255, 255, .07);
+  --line:        rgba(255, 255, 255, .12);
+  --line-strong: rgba(255, 255, 255, .22);
+
+  /* 表面 tint 四档（替掉原来 18 档随手 alpha） */
+  --tint-1: rgba(10, 13, 20, .12);   /* 文档面 / 列表项（比卡片更淡） */
+  --tint-2: rgba(8, 11, 18, .14);    /* 玻璃卡：够透 —— 背后跑的代码必须看得见 */
+  --tint-3: rgba(22, 27, 38, .55);   /* 输入框 / 内嵌 */
+  --tint-4: rgba(7, 9, 15, .62);     /* 顶栏 / 徽标 */
+  --pill:   rgba(255, 255, 255, .06);
+
+  /* 模糊两档。saturate 170% 是「糊成泥」的元凶；但 brightness 压太狠同样会
+     把代码带糊没 —— 卡片是「看代码的窗口」，不是一块遮光板。 */
+  --blur-sm: blur(14px) saturate(120%);
+  --blur-lg: blur(12px) saturate(150%) brightness(.96);   /* 12px：模糊必须小于它要透出的结构尺度 */
+
+  --shadow-card: 0 24px 60px -20px rgba(0, 0, 0, .85), inset 0 1px 0 rgba(255, 255, 255, .30);
+  --tick: var(--line);   /* 准星角标颜色 */
+}
+
+/* 让「死」了的核心令牌真正生效（--bg/--bg-2/--guide/--fg/--fg-2/--gutter 原本 0 次消费） */
+html[data-theme="editor-dark"] {
+  --ed-bg: var(--bg-1);
+  --ed-bg-2: var(--bg-2);
+  --ed-guide: var(--bg-3);
+  --ed-fg: var(--fg-1);
+  --ed-fg-2: var(--fg-2);
+  --ed-gutter: var(--fg-3);
+}
+
+/* ---------- 2. 底色：单色冷渐变，删掉 4 个彩色斑 ---------- */
+html { background: var(--bg-0); }
+body {
+  background-color: var(--bg-1);
+  background-image: linear-gradient(180deg, var(--bg-1) 0%, #090c12 55%, var(--bg-0) 100%);
+  background-repeat: no-repeat;
+  color: var(--fg-1);
+}
+
+/* 氛围层：一处冷光 + 24px 发丝网格（网格给模糊「边缘」，纯渐变被糊完还是纯渐变） */
+body::before {
+  background:
+    /* 代码带的光溢：卡片后面「有东西可透」的主来源（冷色，来自语法高亮的蓝） */
+    radial-gradient(72% 48% at 14% 2%, rgba(77, 163, 232, .22), transparent 68%),
+    /* 代码自身的补色（字符串橙），极淡 —— 只为了让光不平 */
+    radial-gradient(46% 30% at 40% 12%, rgba(206, 145, 120, .07), transparent 70%),
+    /* 纵向亮度坡：紧贴代码带下方最亮，往下衰减 —— 玻璃吃到的就是这束光 */
+    linear-gradient(180deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, 0) 44%),
+    /* 发丝网格：给模糊提供边缘（纯渐变被糊完还是纯渐变） */
+    repeating-linear-gradient(0deg,  rgba(255, 255, 255, .045) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .045) 0 1px, transparent 1px 24px);
+  background-size: auto, auto, auto, auto, auto;
+  -webkit-mask-image: radial-gradient(130% 95% at 50% 0%, #000 0 55%, transparent 100%);
+  mask-image: radial-gradient(130% 95% at 50% 0%, #000 0 55%, transparent 100%);
+}
+
+::selection { background: rgba(77, 163, 232, .28); color: var(--fg-0); }
+
+/* ---------- 3. 顶栏：一档模糊 + 发丝下边 ---------- */
+.top {
+  background: var(--tint-4);
+  border-bottom: 1px solid var(--line-soft);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  box-shadow: none;
+}
+.tab { background: var(--pill); box-shadow: inset 0 0 0 1px var(--line-soft); }
+.tab-name { color: var(--fg-0); }
+.tab-ext { color: var(--fg-2); }
+.nav a { color: var(--fg-2); }
+.nav a:hover, .nav a:focus-visible { color: var(--fg-0); }
+.top-cta { background: var(--accent); color: #04070d; border: 1px solid rgba(255, 255, 255, .14); }
+.top-cta:hover { filter: brightness(1.06); }
+.prog { background: var(--line-soft); }
+.prog i { background: var(--accent); }
+
+/* 状态点：把「读数」变成仪器读数，而不是一行灰字 */
+.top-status { color: var(--fg-2); }
+.top-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(77, 163, 232, .14);
+}
+
+/* ---------- 4. 玻璃卡：一档模糊 + 准星角标（四角 L 形，纯 CSS，零新增 DOM） ---------- */
+.shell, .hero-in {
+  background-color: var(--tint-2);
+  border: 1px solid var(--line-strong);   /* 填充越淡，边缘越要顶上来定义这张卡 */
+  box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: var(--blur-lg);
+  backdrop-filter: var(--blur-lg);
+  background-image:
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+  background-size: 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px;
+  background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+/* 斜向反光退场：改由 1px 上高光（已在 --shadow-card 里）定义玻璃边缘 */
+.shell::before, .hero-in::before { background: none; }
+
+/* ---------- 5. 文字阶梯收敛：9 个灰 → 4 级 ---------- */
+.h1, .h2, .h3, .tl-title, .notice h3, .token-panel h3,
+.link-card .name, .link-card .desc, .token-box code, .field > label { color: var(--fg-0); }
+body, .lede, .tl-desc, .notice-body, .dir-desc, .join-info p, .token-note, .field textarea, .field input, .field select { color: var(--fg-1); }
+.top-status, .nav a, .tab-ext, .dir-code, .dir-idx, .tl-when, .notice-meta, .pane-meta,
+.hint, .form-foot, .form-status, .link-card .chev, .link-card .open-btn, .captcha-img { color: var(--fg-2); }
+.opt, .field input::placeholder, .field textarea::placeholder { color: var(--fg-3); }
+.req { color: var(--del); }
+.form-status.is-ok { color: var(--add); }
+.form-status.is-err { color: var(--del); }
+
+/* 文字局部对比保护：玻璃透了之后，亮代码光斑会从文字底下穿过去。
+   不给文字加遮罩块（那会毁掉"透明卡"的感觉），改成一层大半径暗影 ——
+   只压住字形周围几像素的底，卡片该透还是透。 */
+.lede, .h1, .h2, .h3, .tl-title, .tl-desc, .tl-when, .dir-cn, .dir-desc, .dir-code,
+.hint, .notice h3, .notice-body, .notice-meta, .pane-name, .pane-meta, .field > label {
+  text-shadow: 0 1px 14px rgba(4, 6, 10, .60), 0 0 3px rgba(4, 6, 10, .45);
+}
+
+/* ---------- 6. 按钮 ---------- */
+.btn { background: var(--fg-0); color: var(--bg-0); box-shadow: inset 0 0 0 1px transparent; }
+.btn:hover { background: #fff; }
+.submit { background: var(--accent); color: #04070d; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+.submit:hover { filter: brightness(1.06); }
+.submit[disabled] { background: var(--bg-3); color: var(--fg-3); box-shadow: inset 0 0 0 1px var(--line-soft); }
+.link-btn { color: var(--accent); }
+.link-btn.subtle { color: var(--fg-2); }
+
+/* ---------- 7. 方向行 / 时间线 / 公告 ---------- */
+.dir-row {
+  background: transparent;
+  border-top: 1px solid var(--line-soft);
+  transition: background var(--d-tap) var(--ease-tap), border-color var(--d-tap) var(--ease-tap);
+}
+.dir-row:hover, .dir-row:focus-visible { background: var(--pill); --tick: var(--accent); }
+.dir-row[data-dir] .dir-code { color: var(--dir); }
+
+.tl-item::before { background: var(--line-soft); }                 /* 轨道 */
+.tl-item::after { background: var(--bg-2); border-color: var(--line); }   /* 节点 */
+.tl-item.tl-done::after { background: var(--accent); border-color: var(--accent); }
+.tl-item.tl-active::after { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(77, 163, 232, .16); }
+
+.notice { background: var(--tint-1); border-left-color: var(--line); }
+.notice.pinned { border-left-color: var(--accent); }
+.device-card, #device-card { background: var(--tint-1); border-left-color: var(--accent); }
+
+/* ---------- 8. 文档面 / 字段 / 提示条 ---------- */
+.pane { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.pane-bar { border-bottom: 1px solid var(--line-soft); }
+.pane-meter { background: var(--line-soft); }
+.pane-meter i { background: var(--accent); }
+
+.field input, .field select, .field textarea {
+  background: var(--tint-3);
+  border: 1px solid var(--line-soft);
+  color: var(--fg-1);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: rgba(77, 163, 232, .55);
+  box-shadow: 0 0 0 3px rgba(77, 163, 232, .16);
+  outline: none;
+}
+.field option { background: var(--bg-3); color: var(--fg-0); }
+.captcha-img { box-shadow: inset 0 0 0 1px var(--line-soft); border-radius: var(--radius-in); background: var(--bg-3); }
+
+.banner { background: var(--tint-1); border-left-color: var(--line); }
+.edit-banner { border-left-color: var(--accent); background: var(--tint-1); }
+
+.token-panel { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.token-box { background: var(--bg-3); border: 1px solid var(--line-soft); }
+.token-warn { color: var(--del); }
+
+/* ---------- 9. 加群 / 友链 / 页脚 ---------- */
+.qr img { box-shadow: inset 0 0 0 1px var(--line-soft); border-radius: var(--radius-in); }
+.join-info .warn { border-left: 1px solid var(--line); background: var(--tint-1); }
+.link-card { background: var(--tint-1); border: 1px solid var(--line-soft); }
+.link-card:hover, .link-card.open { border-color: var(--line-strong); --tick: var(--accent); }
+.link-card .open-btn { box-shadow: inset 0 0 0 1px var(--line-soft); background: var(--pill); }
+.foot { color: var(--fg-3); border-top: 1px solid var(--line-soft); }
+
+/* ---------- 10. 代码带：拿到自己的底板（语法色从此有确定底色） ---------- */
+.cf {
+  /* 半透明底板：语法色仍有确定底色，但代码的"光"能透到玻璃卡后面 */
+  border-bottom: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  background-color: rgba(7, 9, 15, .62);
+  /* 关键：卡片有 1120px 宽，代码只占左侧约 360px。右半边背后原本什么都没有，
+     玻璃在那里就退化成一块灰膜。下面三层把「文档结构」横向铺满整条带子：
+       1) 行基线：每个代码行高一条 1px 发丝线，全宽 —— 玻璃糊过去就是"一页文档"
+       2) hunk 线：每 10 行一条微蓝线 —— 像 diff 的分块边界，给长距离节奏
+       3) 折叠线：代码列右侧一条纵向发丝线 —— 给模糊一条竖向边缘 */
+  background-image:
+    repeating-linear-gradient(180deg,
+      rgba(255, 255, 255, .05) 0 1px,
+      transparent 1px calc(var(--cf-fs) * var(--cf-lh))),
+    repeating-linear-gradient(180deg,
+      rgba(77, 163, 232, .10) 0 1px,
+      transparent 1px calc(var(--cf-fs) * var(--cf-lh) * 10));
+  background-position: 0 var(--cf-top), 0 var(--cf-top);
+  background-repeat: repeat, repeat;
+}
+.cf-meta { border-bottom: 1px solid var(--line-soft); color: var(--fg-3); }
+.cf-line::before { color: var(--fg-3); }            /* 行号栏 */
+.cf-line.is-cur { background: rgba(255, 255, 255, .03); }   /* 当前行：不用色块 */
+.cf-hold {
+  background: var(--tint-4);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: var(--blur-sm);
+  backdrop-filter: var(--blur-sm);
+  color: var(--fg-1);
+}
+
+/* ---------- 11. 降级：无 backdrop-filter ---------- */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell, .hero-in { background-color: #0f131b; }
+  .top, .cf-hold { background: var(--bg-0); }
+}
+
+
+/* ---------- 13. 玻璃后面「看得见结构」的三个大尺度手段 ----------
+   教训：backdrop-filter 会把小于模糊半径的结构彻底抹平。
+   1px 发丝线 / 24px 网格 / 2px 缩略图条 在 blur(20px) 后面等于不存在。
+   只有「成团的、和模糊半径同量级或更大」的东西才透得过来：
+     · 代码字形本身（行高 22px 的文字团）
+     · 整行高亮（编辑器的原生行为，而且它会跟着打字往下走 → 玻璃后面有"活"的移动）
+     · 行带（每行一条全宽底色带 = 一页文档的横向层次）                                    */
+
+/* (1) 代码行铺满整条带子：让"当前行高亮"成为全宽色带，而不是只有左边一小截 */
+.cf-body.is-editor .cf-line { width: 100%; }
+
+/* (2) 行带：偶数行 2.2% 白，当前行 7% —— 22px 一条，正好扛得住 blur(12px) */
+.cf-body.is-editor .cf-line:nth-child(even) { background: rgba(255, 255, 255, .022); }
+.cf-body.is-editor .cf-line.is-cur { background: rgba(255, 255, 255, .07); }
+/* 当前行左侧再加一段强调：模糊之后是一团明确的光斑，跟着光标往下走 */
+.cf-body.is-editor .cf-line.is-cur::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 220px;
+  background: linear-gradient(90deg, rgba(77, 163, 232, .16), transparent 100%);
+  pointer-events: none;
+}
+.cf-body.is-editor .cf-line { position: relative; }
+
+/* (3) 缩略图：条加粗到 4px（< 模糊半径的元素会被抹掉，4px 在 blur(12px) 下仍留痕） */
+.cf-mini { gap: 3px; }
+.cf-mini i { height: 4px; background: rgba(255, 255, 255, .26); }
+.cf-mini i.is-key { background: rgba(255, 255, 255, .38); }
+
+
+/* ---------- 14. 桌面端双栏分屏：让代码的发光体量铺满卡片宽度 ----------
+   实测：单栏时字形右缘 x=363，卡片 160→1280 —— 代码只覆盖卡片宽度的 18.1%，
+   其余 82% 的玻璃背后是空的，玻璃在那儿只能是块灰膜。
+   分屏后两栏分别覆盖 ~0→524 与 ~720→1244，覆盖卡片宽度约 79%。
+   .cf-meta / .cf-body 本来就是 position:absolute，所以每个 pane 只要做定位上下文即可，
+   不必改引擎的样式。 */
+.cf-panes { position: absolute; inset: 0; }
+.cf-pane { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.cf-pane:nth-child(1) { left: 0; }
+.cf-pane:nth-child(2) { left: 50%; border-left: 1px solid var(--line-soft); }
+
+/* 窄屏回到单栏（手机上代码带本来就被裁，分屏只会两边都看不清） */
+@media (max-width: 1099px) {
+  .cf-pane { width: 100% !important; }
+  .cf-pane:nth-child(2) { display: none; }
+}

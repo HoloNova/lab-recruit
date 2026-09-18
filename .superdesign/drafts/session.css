@@ -1,0 +1,821 @@
+/* ============================================================
+   方案 C · Session（全场域会话）
+
+   一句话：**整块屏幕就是那台机器，内容是一张张压在按钮上的文档页。**
+
+   与 A / B（Graphite Console / Nebula）的三处主张不同 —— 不是调色，是结构：
+
+   1. 场域从「页面上侧一条带子」变成**整屏**。代码不再是横幅，
+      是这台机器上一直开着的那份文件。
+   2. 版式**机器在左、文档在右，且两栏重叠**：卡片不是排在代码旁边，
+      是压在代码上 —— 左边一截代码仍然清晰，压在卡片下面的那截透过玻璃变成色块。
+   3. 卡片是**玻璃**（半透明 + 背景模糊），不是不透明文档页 ——
+      因为背景本身就是这个页面的主体，把它挡死等于把设计扔了。
+      但玻璃有硬约束（对比度是采像素量出来的，见 §2.3 与 §16 的教训）：
+      模糊半径是透明度的杠杆（模糊把亮峰摊平→同样的可读性下 tint 可以更低）、
+      必须压暗不能提亮、弱文字有下限。
+
+   保留（这是本页的差异化资产，不动）：真实的打字引擎、行号栏、竖条光标、
+   打错回删、整行重写、拉依赖过渡、终端档、方向 → 切档、填表自动暂停。
+
+   颜色仍然只用 themes/02-editor-dark.css 的 VSCode 令牌 —— 新增的只是
+   **表面层级**（ground/surface/sunken），不是新色相。
+   ============================================================ */
+
+/* ================= 1. 令牌 ================= */
+
+:root {
+  /* 场域底 —— 比编辑器灰 #1f1f1f 更暗：语法色是按亮底标定的，
+     底越暗对比度越高，所以深底是安全方向（不是审美偏好）。 */
+  --s-ground: #07090f;
+
+  /* 三层表面：块面 / 块内抬升 / 块内凹陷 */
+  --s-surface: #0d1119;
+  --s-raise:   #131926;
+  --s-sunken:  #090c13;
+
+  /* 文字四档（对 --s-surface #0d1119 实算） */
+  --s-fg-0: #f2f5fa;   /* 标题       17.2:1（实底） */
+  --s-fg-1: #cbd2dd;   /* 正文       12.4:1（实底） */
+  --s-fg-2: #a8b2c0;   /* 次要/说明   8.4:1（实底）—— 玻璃上的下限档，不得再暗 */
+  --s-fg-3: #7e8896;   /* 极弱/装饰   5.1:1 —— 只用于大字与装饰，不承载信息 */
+
+  /* 玻璃（三档，禁止随手写 alpha）。
+     blur 是杠杆：模糊把背后的亮峰摊平，同样的可读性下 tint 就能更低、
+     代码透得更清楚。brightness 只能 < 1 —— 提亮会把文字对背景的对比度打死。
+     ⚠ 真正决定「卡片里看不看得见代码」的是 --s-glass-deep（卡片内部块，
+     它叠在玻璃上），不是 --s-glass。只调 --s-glass 时实测数字纹丝不动 ——
+     调参没影响就说明调错了那一档。 */
+  --s-glass:      rgba(13, 17, 25, .24);   /* 文档页 */
+  --s-glass-deep: rgba(9, 12, 19, .22);    /* 玻璃里的凹陷面（会叠在玻璃上，所以更实） */
+  --s-blur: 16px;
+
+  /* 描边三档 */
+  --s-line-soft:   rgba(255, 255, 255, .07);
+  --s-line:        rgba(255, 255, 255, .12);
+  --s-line-strong: rgba(255, 255, 255, .22);
+
+  /* 语义 */
+  --s-accent: var(--ed-accent, #4da3e8);      /* 交互与状态，不做装饰 */
+  --s-fill:   #0078d4;                        /* 状态栏填充蓝（配白字 4.53:1） */
+  --s-ink:    #06263f;                        /* 亮蓝按钮上的深墨 */
+  --s-add:    var(--ed-add, #4ec9b0);
+  --s-del:    var(--ed-del, #f48771);
+
+  /* 字体：零 webfont。中文在等宽栈上会回退到系统 CJK 字，
+     所以「等宽」影响的是拉丁字母与数字 —— 那正是读数要的地方。 */
+  --s-code: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+            "DejaVu Sans Mono", "Segoe UI Symbol", "Apple Symbols", monospace;
+  --s-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  /* 尺度 */
+  --s-h1: clamp(30px, 7.4vw, 46px);
+  --s-h2: clamp(19px, 4.8vw, 23px);
+  --s-h3: 17px;
+  --s-body: 16px;
+  --s-sm: 14.5px;
+  --s-label: 12px;
+  --s-input: 17px;      /* 不得低于 16px：低于此 iOS 聚焦会缩放整页 */
+
+  --s-top-h: 48px;
+  --s-sb-h: 44px;
+  --s-r: 6px;           /* 小圆角：精密感，不是柔软感 */
+  --s-gap: 68px;        /* 块间距 = 场域的露出高度，不得小于 64px */
+  --s-pad-l: clamp(16px, 5vw, 32px);
+  --s-pad-r: clamp(16px, 5vw, 32px);
+}
+
+@media (min-width: 1180px) {
+  :root {
+    --s-gap: 88px;
+    /* 文档列起点压进代码栏内部：重叠的那截就是玻璃要透出来的东西。
+       起点要足够靠左 —— 代码的墨都集中在每行的前 40–70 字符（x≈54–684），
+       文档列若从 24vw=340px 才开始，卡片只有一半压在墨上，实测透过率只有 +1%；
+       从 14vw≈200px 开始时，卡片 80% 的面积压在墨上。 */
+    --s-pad-l: min(14vw, 200px);
+    --s-pad-r: clamp(24px, 6vw, 96px);
+  }
+}
+
+/* ================= 2. 基座 ================= */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--s-ground);
+  color: var(--s-fg-1);
+  font-family: var(--s-ui);
+  font-size: var(--s-body);
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body > div { position: relative; min-height: 100vh; }
+
+h1, h2, h3 { margin: 0; color: var(--s-fg-0); line-height: 1.24; font-weight: 650; }
+p { margin: 0; }
+img { max-width: 100%; height: auto; }
+
+/* 选区用 VSCode 的选区蓝 —— 这个小细节决定了「是不是同一个世界」 */
+::selection { background: #264f78; color: #fff; }
+
+a { color: var(--s-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible { outline: 2px solid var(--s-accent); outline-offset: 2px; border-radius: 3px; }
+
+/* 读数的等宽三件套：等宽 + 表格数字对齐 */
+.mono, .h2-en, .dir-idx, .tl-when, .pane-meta, .sb-where, .sb-phase, .statusbar,
+.dir-code, .hint, .req, .opt, .foot, .h3, .warn { font-family: var(--s-code); }
+
+.mono { font-variant-numeric: tabular-nums; }
+
+.hint { color: var(--s-fg-2); font-size: var(--s-sm); margin: 0; }
+.warn { color: var(--s-del); }
+.req  { color: var(--s-del); }
+.opt  { color: var(--s-fg-3); font-size: var(--s-label); letter-spacing: .04em; }
+
+/* 锚点跳转要避开顶栏，否则标题会钻到顶栏下面 */
+section[id] { scroll-margin-top: calc(var(--s-top-h) + 14px); }
+
+/* ================= 3. 场域：整屏 ================= */
+
+/* codefield.css 把它做成「页面上侧一条带子」（--cf-h / bottom:36%）。
+   Session 把它翻过来：整屏、贴左、右侧渐隐 —— 代码是一份开着的文件，
+   不是一条横幅。高度改由 100dvh 决定，--cf-h 不再参与。 */
+.cf {
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  /* 渐隐改成从左上角发散的径向遮罩：代码在左上是实的，
+     越往右下越溶进底色 —— 右侧正是文档列所在的地方。 */
+  /* 遮罩：只在四角收边，别把场域在中段就杀干 ——
+     卡片是玻璃，需要背后**有东西可透**，代码得在整个宽度上活着。 */
+  -webkit-mask-image: radial-gradient(165% 130% at 6% 0%,
+      #000 0 66%, rgba(0, 0, 0, .72) 84%, rgba(0, 0, 0, .34) 100%);
+  mask-image: radial-gradient(165% 130% at 6% 0%,
+      #000 0 66%, rgba(0, 0, 0, .72) 84%, rgba(0, 0, 0, .34) 100%);
+  font-size: 13.5px;
+}
+
+/* 代码栏：满宽打底（手机端就是全屏背景），桌面端再整体**右移一份
+   压到文档列下面** —— 这是「玻璃后面真的有东西」的前提。
+   文档列左右各露出一截清晰代码（左≈130px、右≈200px），卡片本身坐在代码上。
+
+   ⚠ 必须写成 `.cf .cf-body`：codefield.css 里是 `.cf-body.is-editor { top: var(--cf-top) }`
+   （特异性 0,2,0），只写 `.cf-body`（0,1,0）根本盖不住 —— 实测代码会顶到 y=30，
+   被顶栏压掉一截。这个坑不量位置就看不出来。 */
+.cf .cf-body {
+  top: calc(var(--s-top-h) + 26px);
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+@media (min-width: 1180px) {
+  .cf .cf-body {
+    left: 0;
+    right: clamp(40px, 4vw, 90px);
+  }
+  /* 桌面端代码可以大一号：它是壁纸，大一点才盖得住卡片底下那块面积 */
+  .cf { font-size: 15px; }
+}
+
+/* 行号栏与代码之间一条竖发丝线：这是「编辑器」最省力的签名 */
+.cf-body.is-editor::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(var(--cf-gut) - 8px);
+  width: 1px;
+  background: var(--s-line-soft);
+  pointer-events: none;
+}
+
+@media (max-width: 899px) {
+  .cf-body.is-editor::before { left: calc(30px - 6px); }
+}
+
+/* 面包屑：文件名 + 语言，压在顶栏之下 */
+.cf-meta {
+  top: var(--s-top-h);
+  height: 26px;
+  padding-left: 14px;
+  font-size: 12px;
+  opacity: 1;
+  color: var(--s-fg-2);
+}
+.cf-meta::after { opacity: .10; }
+
+/* 暂停徽标：不再是一块小玻璃（这里没有玻璃），改成不透明标签 */
+.cf-hold {
+  top: calc(var(--s-top-h) + 10px);
+  right: 12px;
+  background: #0a0e15;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--s-line);
+  color: var(--s-fg-0);
+  font-family: var(--s-code);
+  font-size: 11px;
+  line-height: 1.35;
+  border-radius: 4px;
+}
+
+/* ================= 4. 顶栏：编辑器标签条 ================= */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  /* 顶栏也是玻璃：代码从它底下滑过去 */
+  background: rgba(13, 17, 25, .52);
+  -webkit-backdrop-filter: blur(16px) saturate(130%) brightness(.88);
+  backdrop-filter: blur(16px) saturate(130%) brightness(.88);
+  border-bottom: 1px solid var(--s-line-soft);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .top { background: var(--s-surface); }
+}
+
+.top-in {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: var(--s-top-h);
+  padding: 0 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.top-in::-webkit-scrollbar { display: none; }
+
+/* 身份标签 = 当前打开的文件 */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  padding: 0 14px;
+  background: var(--s-raise);
+  border-top: 2px solid var(--s-accent);
+  color: var(--s-fg-0);
+  font-family: var(--s-code);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tab:hover { text-decoration: none; }
+.tab-ext { color: var(--s-fg-3); }
+
+/* 导航 = 一组未打开的文件标签 */
+.nav { display: none; align-items: stretch; gap: 2px; margin-left: 8px; }
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--s-fg-2);
+  font-family: var(--s-code);
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+}
+.nav a:hover {
+  background: var(--s-raise);
+  color: var(--s-fg-0);
+  text-decoration: none;
+  border-bottom-color: var(--s-line-strong);
+}
+
+/* CTA 挤到最右，hairlane 描边（面板里另有一个实心主按钮） */
+.top-cta {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 16px;
+  min-height: 44px;              /* 可点元素 ≥44px */
+  align-self: center;
+  border: 1px solid var(--s-line-strong);
+  border-radius: var(--s-r);
+  color: var(--s-fg-0);
+  font-family: var(--s-code);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.top-cta:hover { border-color: var(--s-accent); color: var(--s-accent); text-decoration: none; }
+
+/* 阅读进度：顶栏下沿一条 2px 线 */
+.prog { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: transparent; }
+.prog i { display: block; height: 100%; width: 0; background: var(--s-accent); opacity: .85; }
+
+@media (min-width: 760px) { .nav { display: flex; } }
+
+/* ================= 5. 状态栏（拇指区） ================= */
+
+.statusbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: calc(var(--s-sb-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--s-fill);
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+
+.sb-where, .sb-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-where { color: #fff; opacity: .92; }
+.sb-phase { opacity: .92; }
+.sb-sp { flex: 1 1 auto; min-width: 0; }
+
+.sb-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 18px;
+  min-width: 44px;               /* 可点元素 ≥44px */
+  color: #fff;
+  border-left: 1px solid rgba(255, 255, 255, .22);
+  white-space: nowrap;
+}
+.sb-link:hover { background: rgba(255, 255, 255, .14); text-decoration: none; }
+.sb-cta { background: rgba(255, 255, 255, .16); font-weight: 600; }
+.sb-cta:hover { background: rgba(255, 255, 255, .24); }
+
+/* 阶段点：6px 圆点 + 文本（读数化，不用色块） */
+.statusdot {
+  width: 6px; height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .22);
+}
+
+/* ================= 6. 版面：左机器 / 右文档 ================= */
+
+.page {
+  position: relative;
+  z-index: 2;
+  padding: 26px var(--s-pad-r) calc(var(--s-sb-h) + var(--s-gap));
+  padding-left: var(--s-pad-l);
+}
+
+/* 文档块之间的空气 = 场域的露出高度。这一条是整套设计的成立条件：
+   内容盖不到的地方，看到的是全饱和、还在动的原生代码。 */
+.sec + .sec { margin-top: var(--s-gap); }
+
+.shell {
+  max-width: 640px;
+  /* 玻璃：tint 只承担一半，另一半交给 blur 把背后的亮峰摊平 */
+  background: var(--s-glass);
+  -webkit-backdrop-filter: blur(var(--s-blur)) saturate(132%) brightness(.96);
+  backdrop-filter: blur(var(--s-blur)) saturate(132%) brightness(.96);
+  border: 1px solid var(--s-line-soft);
+  border-radius: var(--s-r);
+  padding: 24px 22px 26px;
+  /* 内上高光把玻璃的「厚度」画出来（玻璃可薄，但不能没有边） */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10), 0 28px 64px -28px rgba(0, 0, 0, .92);
+}
+
+/* 不支持背景模糊时退回实底 —— 半透明 + 背后跑代码 = 文字直接报废 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell { background: var(--s-surface); }
+}
+
+/* 手机端把模糊半径收小：小屏的玻璃面积占比最大，低端安卓在这里最先掉帧。
+   18px 仍然足够摊平亮峰（实测见 worstcase.js 的 p99）。 */
+@media (max-width: 700px) {
+  :root { --s-blur: 14px; }
+}
+
+/* 面板头：等宽小字 + 发丝分隔（不用阴影、不用色块） */
+.h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--s-h2);
+  font-family: var(--s-code);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--s-line-soft);
+  flex-wrap: wrap;
+}
+/* 小节自己的行号：和左边编辑器共用同一套「gutter」语言 */
+.h2::before {
+  content: counter(sec, decimal-leading-zero);
+  font-size: 12px;
+  color: var(--s-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.page { counter-reset: sec; }
+.sec  { counter-increment: sec; }
+
+/* 眉标 = 一条命令回显 */
+.h2-en {
+  font-size: 12px;
+  letter-spacing: .14em;
+  color: var(--s-fg-2);
+  font-weight: 400;
+  order: -1;
+  flex-basis: 100%;
+}
+.h2-en::before { content: '❯ '; color: var(--s-accent); }
+
+.h3 { font-size: var(--s-label); letter-spacing: .12em; color: var(--s-fg-2); text-transform: uppercase; margin: 22px 0 10px; }
+
+/* ================= 7. HERO：直接站在机器上 ================= */
+
+.hero { max-width: 640px; padding-top: clamp(24px, 8vh, 88px); }
+
+/* 文字下面一张定向遮罩：代码在标题上下继续走，只有文字底下被压暗到安全区。
+   对比度按「最坏情况 = 全饱和的 #dcdcaa 压过 0.86 的黑」算 ≈ 13:1。 */
+.hero-in {
+  background:
+    radial-gradient(120% 78% at 12% 34%, rgba(7, 9, 15, .90) 0 42%, rgba(7, 9, 15, .62) 66%, transparent 100%);
+  padding: 4px 0;
+}
+
+.h1 { font-size: var(--s-h1); letter-spacing: -.01em; margin-bottom: 14px; }
+
+.lede {
+  color: var(--s-fg-1);
+  font-size: var(--s-body);
+  max-width: 44ch;
+  margin-bottom: 24px;
+}
+
+/* 主按钮：亮蓝面 + 深墨字（#4da3e8 配白字只有 2.72:1，配深墨 5.9:1） */
+.btn, .submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 22px;
+  background: var(--s-accent);
+  color: var(--s-ink);
+  border: 0;
+  border-radius: var(--s-r);
+  font-family: var(--s-code);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 90ms var(--ease-tap, ease);
+}
+.btn:hover, .submit:hover { filter: brightness(1.08); text-decoration: none; }
+.btn:active, .submit:active { transform: translateY(1px); }
+.btn::after { content: '→'; font-weight: 400; }
+
+/* ================= 8. 方向：编辑器里的缓冲区行 ================= */
+
+.dir-list { display: grid; gap: 1px; background: var(--s-line-soft); border-block: 1px solid var(--s-line-soft); }
+
+.dir-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  grid-template-areas:
+    "idx  cn"
+    "code code"
+    "desc desc";
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 14px 12px 14px 8px;
+  background: var(--s-glass-deep);   /* 方向行也是玻璃上的玻璃 —— 不能把代码挡死 */
+  border: 0;
+  border-left: 2px solid transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+/* 行号栏：和编辑器同宽同色，读起来就是行首 */
+.dir-idx {
+  grid-area: idx;
+  font-size: 12px;
+  color: var(--s-fg-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dir-cn { grid-area: cn; font-size: 18px; color: var(--s-fg-0); font-weight: 600; }
+.dir-code {
+  grid-area: code;
+  font-size: 12.5px;
+  color: var(--s-fg-2);
+  overflow-wrap: anywhere;
+}
+.dir-desc { grid-area: desc; font-size: var(--s-sm); color: var(--s-fg-2); }
+
+/* 四个方向各一个记号色 —— 与代码带里的语法色同源 */
+[data-dir="sw"] .dir-code { color: var(--dir-sw, #4da3e8); }
+[data-dir="hw"] .dir-code { color: var(--dir-hw, #e0a458); }
+[data-dir="al"] .dir-code { color: var(--dir-al, #c586e0); }
+[data-dir="ai"] .dir-code { color: var(--dir-ai, #4ec9b0); }
+
+.dir-row:hover, .dir-row:focus-visible {
+  background: rgba(19, 25, 38, .74);
+  border-left-color: var(--s-line-strong);
+  outline: none;
+}
+.dir-row[aria-pressed="true"] {
+  background: rgba(19, 25, 38, .74);
+  border-left-color: var(--s-accent);
+}.dir-row:hover .dir-cn, .dir-row[aria-pressed="true"] .dir-cn { color: var(--s-fg-0); }
+
+#dir-hint { margin-top: 16px; }
+
+/* ================= 9. 流程：提交历史 ================= */
+
+.tl { list-style: none; margin: 0; padding: 0; }
+
+.tl-item {
+  position: relative;
+  padding: 0 0 24px 26px;
+  border-left: 1px solid var(--s-line-soft);
+  margin-left: 5px;
+}
+.tl-item:last-child { padding-bottom: 0; border-left-color: transparent; }
+
+/* 提交点 */
+.tl-item::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 7px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--s-surface);
+  border: 1px solid var(--s-line-strong);
+}
+.tl-item[data-phase="warmup"]::before {
+  background: var(--s-accent);
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 4px rgba(77, 163, 232, .16);
+}
+
+.tl-when {
+  display: block;
+  font-size: 12px;
+  color: var(--s-fg-2);
+  margin-bottom: 2px;
+}
+.tl-title { font-size: var(--s-h3); margin-bottom: 4px; }
+.tl-item[data-phase="warmup"] .tl-title { color: var(--s-fg-0); }
+.tl-desc { color: var(--s-fg-2); font-size: var(--s-sm); }
+.tl-desc strong { color: var(--s-fg-1); }
+
+
+/* ================= 10. 报名表：一张文档页 ================= */
+
+.pane {
+  background: var(--s-glass-deep);
+  border: 1px solid var(--s-line-soft);
+  border-radius: var(--s-r);
+  overflow: hidden;
+}
+
+.pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(19, 25, 38, .62);
+  border-bottom: 1px solid var(--s-line-soft);
+  font-size: 12px;
+}
+.pane-name { color: var(--s-fg-0); font-family: var(--s-code); }
+.pane-meta { margin-left: auto; color: var(--s-fg-2); }
+.pane-meta .mono { color: var(--s-fg-0); }
+
+.pane-meter { height: 2px; background: var(--s-line-soft); }
+.pane-meter i { display: block; height: 100%; width: 0; background: var(--s-add); }
+
+.pane-body { padding: 20px 16px 22px; }
+
+/* 表单：单列，标签在上（中文标签不适合占一列） */
+#app-form { display: grid; gap: 16px; }
+.field { display: grid; gap: 7px; }
+.field.full { grid-column: 1 / -1; }
+
+.field label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--s-sm);
+  color: var(--s-fg-1);
+  font-weight: 500;
+}
+
+input[type="text"], select, textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 12px;
+  background: var(--s-ground);
+  color: var(--s-fg-0);
+  border: 1px solid var(--s-line);
+  border-radius: var(--s-r);
+  font-family: var(--s-ui);
+  font-size: var(--s-input);
+  line-height: 1.5;
+}
+textarea { min-height: 92px; resize: vertical; }
+select { font-family: var(--s-ui); }
+input::placeholder, textarea::placeholder { color: var(--s-fg-3); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--s-accent);
+  box-shadow: 0 0 0 3px rgba(77, 163, 232, .18);
+}
+input:disabled, select:disabled, textarea:disabled { opacity: .5; }
+
+.captcha-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.captcha-img {
+  width: 150px; height: 50px;
+  border: 1px solid var(--s-line);
+  border-radius: var(--s-r);
+  background: #fff;
+  object-fit: cover;
+}
+
+/* 文字按钮：无填充 + 下划线（不抢主按钮） */
+.link-btn {
+  min-height: 44px;
+  padding: 0 10px;
+  background: none;
+  border: 1px dashed var(--s-line);
+  border-radius: var(--s-r);
+  color: var(--s-accent);
+  font-family: var(--s-code);
+  font-size: 13px;
+  cursor: pointer;
+}
+.link-btn:hover { border-color: var(--s-accent); }
+
+.actions { gap: 12px; }
+.form-status { font-family: var(--s-code); font-size: 13px; color: var(--s-fg-2); min-height: 18px; }
+.form-foot { grid-column: 1 / -1; font-size: var(--s-sm); color: var(--s-fg-2); }
+
+/* 提示条 / 设备卡 / 编辑态：左侧一条语义发丝线，不整块染色 */
+.banner, .edit-banner {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--s-glass-deep);
+  border: 1px solid var(--s-line-soft);
+  border-left: 2px solid var(--s-accent);
+  border-radius: var(--s-r);
+  font-size: var(--s-sm);
+  color: var(--s-fg-1);
+}
+.edit-banner { border-left-color: var(--s-add); }
+#device-card { border-left-color: var(--s-fg-3); }
+.edit-banner .link-btn { justify-self: start; }
+
+/* 编辑码面板：一次性凭证，用 add 色标成「请你保存」 */
+.token-panel {
+  margin-top: 20px;
+  padding: 18px 16px;
+  background: var(--s-glass-deep);
+  border: 1px solid var(--s-line-soft);
+  border-left: 2px solid var(--s-add);
+  border-radius: var(--s-r);
+}
+.token-panel h3 { font-size: var(--s-h3); margin-bottom: 8px; }
+.token-note { font-size: var(--s-sm); color: var(--s-fg-2); }
+.token-note strong { color: var(--s-fg-0); }
+.token-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--s-ground);
+  border: 1px solid var(--s-line);
+  border-radius: var(--s-r);
+}
+.token-box code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--s-code);
+  font-size: 15px;
+  color: var(--s-add);
+  overflow-wrap: anywhere;
+}
+.token-warn { font-size: var(--s-sm); color: var(--s-del); }
+
+/* ================= 11. 加群 + 友链 ================= */
+
+.join-grid { display: grid; gap: 18px; }
+.join-info { display: grid; gap: 12px; }
+.join-info p { font-size: var(--s-sm); color: var(--s-fg-1); }
+
+.qr {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 16px;
+  min-height: 180px;
+  background: var(--s-glass-deep);
+  border: 1px dashed var(--s-line);
+  border-radius: var(--s-r);
+}
+.qr img { width: 160px; height: 160px; border-radius: 4px; background: #fff; }
+.qr #qr-fallback { text-align: center; max-width: 24ch; }
+
+/* 公告：终端输出的一块块 */
+.notice-list { display: grid; gap: 1px; background: var(--s-line-soft); border: 1px solid var(--s-line-soft); border-radius: var(--s-r); overflow: hidden; }
+.notice-list > * { background: var(--s-glass-deep); padding: 14px; margin: 0; font-size: var(--s-sm); }
+.notice h3 { font-size: var(--s-h3); margin-bottom: 4px; }
+.notice-meta { font-size: var(--s-label); color: var(--s-fg-2); margin-bottom: 8px; }
+.notice-body { color: var(--s-fg-2); }
+.notice.pinned { border-left: 2px solid var(--s-accent); }
+
+/* 友链：折叠卡片（真实行为：点卡片展开，展开后才有「在新标签页打开」） */
+.link-list { display: grid; gap: 1px; background: var(--s-line-soft); border: 1px solid var(--s-line-soft); border-radius: var(--s-r); overflow: hidden; }
+.link-card {
+  display: grid;
+  gap: 8px;
+  background: var(--s-glass-deep);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.link-card:hover { background: rgba(19, 25, 38, .74); }
+.link-card .name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--s-fg-0);
+  font-size: var(--s-sm);
+  font-weight: 600;
+}
+.link-card .chev { color: var(--s-fg-3); font-family: var(--s-code); transition: transform 160ms ease; }
+.link-card[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.link-card .desc { color: var(--s-fg-2); font-size: var(--s-label); line-height: 1.6; }
+.link-card[aria-expanded="false"] .desc,
+.link-card[aria-expanded="false"] .open-btn { display: none; }
+
+.open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;              /* 可点元素 ≥44px */
+  padding: 0 14px;
+  border: 1px solid var(--s-line);
+  border-radius: var(--s-r);
+  color: var(--s-accent);
+  font-family: var(--s-code);
+  font-size: 13px;
+}
+.open-btn:hover { border-color: var(--s-accent); text-decoration: none; }
+.link-list a { color: var(--s-accent); }
+
+.foot {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--s-line-soft);
+  font-size: var(--s-label);
+  color: var(--s-fg-3);
+}
+
+@media (min-width: 640px) {
+  .join-grid { grid-template-columns: 192px 1fr; align-items: start; }
+  .captcha-row { grid-template-columns: 150px 1fr auto; }
+}
+
+/* ================= 12. 降级 ================= */
+
+@media print {
+  .cf, .cf-hold, .statusbar, .top { display: none !important; }
+  body, .shell, .pane { background: #fff !important; color: #000 !important; }
+  .page { padding: 0 !important; }
+  .shell { border-color: #ccc; box-shadow: none; max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
